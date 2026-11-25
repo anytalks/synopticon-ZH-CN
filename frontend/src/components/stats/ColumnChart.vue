@@ -31,7 +31,7 @@ const props = withDefaults(
     variant: 'column',
     height: 140,
     highlight: 'max',
-    emptyText: 'Nothing to chart yet.',
+    emptyText: '暂无图表数据。',
   },
 )
 
@@ -109,13 +109,13 @@ function showAxisLabel(i: number): boolean {
 }
 
 const summary = computed(() => {
-  if (!hasData.value) return `${props.label}: no data`
+  if (!hasData.value) return `${props.label}：暂无数据`
   const top = props.columns.reduce((a, c) => (c.value > a.value ? c : a))
   const first = props.columns[0]
   const last = props.columns[n.value - 1]
   return (
-    `${props.label}, ${n.value} values from ${first.label} to ${last.label}. ` +
-    `Highest: ${top.label} at ${fmt(top.value)}. Use the arrow keys to read each value.`
+    `${props.label}，共 ${n.value} 项数据（从 ${first.label} 到 ${last.label}）。` +
+    `最高值：${top.label}，${fmt(top.value)}。使用左右方向键可逐项查看数值。`
   )
 })
 
@@ -235,10 +235,10 @@ function onKey(e: KeyboardEvent): void {
         </div>
       </div>
       <p class="sr-only" aria-live="polite">
-        {{ activeColumn ? `${activeColumn.label}: ${fmt(activeColumn.value)}` : '' }}
+        {{ activeColumn ? `${activeColumn.label}：${fmt(activeColumn.value)}` : '' }}
       </p>
       <details class="table-view">
-        <summary>Show as table</summary>
+        <summary>以表格查看</summary>
         <table class="data">
           <caption class="sr-only">{{ label }}</caption>
           <tbody>

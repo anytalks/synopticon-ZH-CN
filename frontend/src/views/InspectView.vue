@@ -82,6 +82,27 @@ const rotation = computed(() => report.value?.display.rotation ?? 0)
 
 const spaces = computed(() => meta.value?.spaces ?? ['personal'])
 
+const SPACE_LABELS: Record<string, string> = {
+  personal: '个人空间',
+  shared: '共享空间',
+}
+const KIND_LABELS: Record<string, string> = {
+  assign: '归属认领',
+  low_confidence: '低置信度复核',
+  reassign: '改判人物',
+  merge: '合并未命名分组',
+  merge_named: '合并已命名人物',
+  new_person: '发现新人物',
+}
+const STATUS_LABELS: Record<string, string> = {
+  pending: '待审核',
+  approved: '已通过',
+  rejected: '已拒绝',
+  hidden: '已隐藏',
+  applied: '已写回',
+  failed: '写回失败',
+}
+
 function fmtTime(t: number | null | undefined): string {
   return t ? new Date(t * 1000).toLocaleString() : '—'
 }
@@ -121,7 +142,7 @@ function parseTarget(raw: string): { space: string; id: number } | null {
 function submit(): void {
   const target = parseTarget(query.value)
   if (!target) {
-    error.value = 'Enter a photo id, or paste a link to one.'
+    error.value = '请输入照片 ID，或粘贴照片链接。'
     return
   }
   error.value = ''
@@ -142,7 +163,7 @@ async function load(sp: string, id: number): Promise<void> {
   } catch (e: unknown) {
     report.value = null
     error.value =
-      e instanceof ApiError ? e.message : (e as Error).message || 'Could not load that photo'
+      e instanceof ApiError ? e.message : (e as Error).message || '无法加载该照片'
   } finally {
     loading.value = false
   }
@@ -235,7 +256,7 @@ const activeFrame = computed(() => {
 const alignment = computed<{ tone: 'info' | 'warn'; text: string } | null>(() => {
   const r = report.value
   if (!r) return null
-  const stored = `${r.photo.width ?? '?'}×${r.photo.height ?? '?'}, orientation ${
+  const stored = `${r.photo.width ?? '?'}×${r.photo.height ?? '?'}，方向值 ${
     r.photo.orientation ?? '—'
   }`
   const parts: string[] = []
@@ -243,27 +264,23 @@ const alignment = computed<{ tone: 'info' | 'warn'; text: string } | null>(() =>
 
   if (reframed.value) {
     parts.push(
-      `The stored resolution (${stored}) is the transpose of the photo the NAS returned, ` +
-        'so our boxes are measured against the frame it actually arrived in.',
+      `记录的分辨率（${stored}）与群晖 NAS 返回的照片宽高互换，因此本页已按实际返回画幅重新换算检测框位置。`,
     )
   } else if (skewed.value && transposed.value && rotation.value === 0) {
     tone = 'warn'
     parts.push(
-      `The photo the NAS returned is the transpose of the frame these boxes assume (${stored}), ` +
-        'and Synology has no faces on it to settle which is right, so they may be misaligned.',
+      `群晖 NAS 返回的照片与检测框所依据的画幅（${stored}）宽高互换，且群晖照片中该图无人脸框可供校准，检测框可能偏移。`,
     )
   } else if (skewed.value && rotation.value === 0) {
     tone = 'warn'
     parts.push(
-      `The photo the NAS returned is not shaped like the stored resolution (${stored}), and the ` +
-        'difference is not a rotation, so the boxes may be misaligned.',
+      `群晖 NAS 返回的照片比例与记录的分辨率（${stored}）不一致，且并非旋转导致，检测框可能偏移。`,
     )
   }
 
   if (rotation.value !== 0) {
     parts.push(
-      `Our boxes are turned ${rotation.value}° to match the photo, matched against ` +
-        "Synology's own faces.",
+      `已参照群晖照片自带人脸框将检测框旋转 ${rotation.value}° 以对齐照片。`,
     )
   }
   return parts.length ? { tone, text: parts.join(' ') } : null
@@ -335,15 +352,14 @@ async function onAssign(target: ReviewPersonSuggestion): Promise<void> {
     picker.value = null
     toast(
       res.kind === 'reassign'
-        ? `Queued: move face #${face.face_id} to ${target.name}. Apply writes it only ` +
-            'with reassignments enabled.'
-        : `Queued: face #${face.face_id} is ${target.name}. Run Apply to write it.`,
+        ? `已加入待写回队列：将人脸 #${face.face_id} 改判为 ${target.name}。需在「写回群晖」中勾选「改判人物」才会生效。`
+        : `已加入待写回队列：将人脸 #${face.face_id} 标记为 ${target.name}。请前往「写回群晖」执行写入。`,
       'ok',
     )
     await refresh()
   } catch (e) {
     toast(
-      e instanceof ApiError ? e.message : (e as Error).message || 'Could not queue that tag',
+      e instanceof ApiError ? e.message : (e as Error).message || '加入待写回队列失败',
       'error',
     )
   } finally {
@@ -361,7 +377,9 @@ const reviewFor = computed(() => {
   for (const item of report.value?.review_items ?? []) {
     for (const fid of item.face_ids) {
       const list = map.get(fid) ?? []
-      list.push(`${item.kind} · ${item.status}`)
+      const kindLabel = KIND_LABELS[item.kind] ?? item.kind
+      const statusLabel = STATUS_LABELS[item.status] ?? item.status
+      list.push(`${kindLabel} · ${statusLabel}`)
       map.set(fid, list)
     }
   }
@@ -405,40 +423,40 @@ watch(() => [route.params.space, route.params.photoId], syncFromRoute)
 <template>
   <div class="page inspect-page">
     <section class="card ins-finder">
-      <h3>Inspect a photo</h3>
+      <h3>照片检视</h3>
       <p class="muted">
-        Show every face found in a photo, with its scores, alongside the faces already in Synology Photos.
+        查看单张照片中检出的所有人脸及其置信度评分，并与群晖照片中已有的人脸标注进行对照。
       </p>
       <form class="ins-form" @submit.prevent="submit">
         <select
           v-if="spaces.length > 1"
           class="select input-sm"
           v-model="space"
-          aria-label="Library"
+          aria-label="空间"
         >
-          <option v-for="s in spaces" :key="s" :value="s">{{ s }}</option>
+          <option v-for="s in spaces" :key="s" :value="s">{{ SPACE_LABELS[s] ?? s }}</option>
         </select>
         <input
           class="input"
           v-model="query"
-          placeholder="ID of a Synology Photos photo, or a link to one"
-          aria-label="Photo id"
+          placeholder="输入群晖照片 ID，或粘贴照片链接"
+          aria-label="照片 ID"
         />
-        <button type="submit" class="btn btn-primary">Inspect</button>
+        <button type="submit" class="btn btn-primary">检视</button>
       </form>
       <p v-if="error" class="ins-error">{{ error }}</p>
     </section>
 
-    <p v-if="loading" class="muted">Loading…</p>
+    <p v-if="loading" class="muted">加载中…</p>
 
     <template v-if="report && !loading">
       <section class="card ins-canvas-card">
         <header class="ins-head">
           <div>
-            <h3>{{ report.photo.filename || `Photo ${report.photo_id}` }}</h3>
+            <h3>{{ report.photo.filename || `照片 #${report.photo_id}` }}</h3>
             <p class="muted">
-              {{ report.space }} · id {{ report.photo_id }} · {{ fmtTime(report.photo.time) }}
-              <span v-if="report.photo.deleted"> · deleted on the NAS</span>
+              {{ SPACE_LABELS[report.space] ?? report.space }} · ID {{ report.photo_id }} · {{ fmtTime(report.photo.time) }}
+              <span v-if="report.photo.deleted"> · 已在群晖 NAS 上删除</span>
             </p>
           </div>
           <a
@@ -447,20 +465,20 @@ watch(() => [route.params.space, route.params.photoId], syncFromRoute)
             :href="report.nas_url"
             target="_blank"
             rel="noopener"
-            >View on NAS</a
+            >在群晖照片中查看</a
           >
         </header>
 
         <div class="ins-toggles">
           <label class="opt-check"
-            ><input type="checkbox" v-model="showOurs" /> Our faces ({{ report.faces.length }})
+            ><input type="checkbox" v-model="showOurs" /> Synopticon 检出人脸 ({{ report.faces.length }})
           </label>
           <label class="opt-check"
-            ><input type="checkbox" v-model="showTheirs" /> Synology faces ({{
+            ><input type="checkbox" v-model="showTheirs" /> 群晖原有人脸 ({{
               report.syno_faces.length
             }})
           </label>
-          <label class="opt-check"><input type="checkbox" v-model="showLandmarks" /> Landmarks</label>
+          <label class="opt-check"><input type="checkbox" v-model="showLandmarks" /> 关键点</label>
         </div>
 
         <div
@@ -475,7 +493,7 @@ watch(() => [route.params.space, route.params.photoId], syncFromRoute)
             <img
               class="ins-img"
               :src="report.image_url"
-              :alt="report.photo.filename || 'photo'"
+              :alt="report.photo.filename || '照片'"
               draggable="false"
               @load="onImageLoad"
             />
@@ -514,12 +532,12 @@ watch(() => [route.params.space, route.params.photoId], syncFromRoute)
                 class="ins-box theirs"
                 :style="boxStyle(sf.box)"
               >
-                <span class="ins-tag">{{ sf.name || 'unnamed' }}</span>
+                <span class="ins-tag">{{ sf.name || '未命名' }}</span>
               </span>
             </template>
           </div>
 
-          <div class="ins-zoom" role="group" aria-label="Zoom" @pointerdown.stop @dblclick.stop>
+          <div class="ins-zoom" role="group" aria-label="缩放控制" @pointerdown.stop @dblclick.stop>
             <span v-if="pan.zoomed.value" class="ins-zoom-level"
               >{{ Math.round(pan.scale.value * 100) }}%</span
             >
@@ -527,8 +545,8 @@ watch(() => [route.params.space, route.params.photoId], syncFromRoute)
               type="button"
               class="ins-zoom-btn"
               :disabled="pan.atMax.value"
-              title="Zoom in — scroll, pinch or double-click the photo"
-              aria-label="Zoom in"
+              title="放大 — 可使用滚轮、双指捏合或双击照片"
+              aria-label="放大"
               @click="pan.zoomIn"
             >
               +
@@ -537,8 +555,8 @@ watch(() => [route.params.space, route.params.photoId], syncFromRoute)
               type="button"
               class="ins-zoom-btn"
               :disabled="!pan.zoomed.value"
-              title="Zoom out"
-              aria-label="Zoom out"
+              title="缩小"
+              aria-label="缩小"
               @click="pan.zoomOut"
             >
               &minus;
@@ -547,8 +565,8 @@ watch(() => [route.params.space, route.params.photoId], syncFromRoute)
               type="button"
               class="ins-zoom-btn"
               :disabled="!pan.zoomed.value"
-              title="Fit the whole photo"
-              aria-label="Fit the whole photo"
+              title="自适应完整照片"
+              aria-label="自适应完整照片"
               @click="pan.reset"
             >
               &#9633;
@@ -562,11 +580,10 @@ watch(() => [route.params.space, route.params.photoId], syncFromRoute)
       </section>
 
       <section class="card">
-        <h3>Detected faces</h3>
+        <h3>检出的人脸</h3>
         <p v-if="!report.faces.length" class="muted">
-          No faces detected yet<template v-if="!report.extract"> — this photo has not been
-          through Detect faces</template
-          >.
+          尚未检出人脸<template v-if="!report.extract"> — 此照片尚未运行「人脸检测与提取」</template
+          >。
         </p>
         <div class="ins-faces">
           <article
@@ -585,44 +602,44 @@ watch(() => [route.params.space, route.params.photoId], syncFromRoute)
                 alt=""
                 loading="lazy"
               />
-              <div v-else class="ins-crop ins-crop-missing" title="no crop on disk">no crop</div>
+              <div v-else class="ins-crop ins-crop-missing" title="磁盘上无裁切图">无裁切图</div>
               <button
                 type="button"
                 class="btn btn-sm ins-tag-btn"
                 :title="
                   isTagged(face)
-                    ? 'Queue this face to move to someone else'
-                    : 'Queue this face as someone, even if nothing proposed it'
+                    ? '将此人脸加入队列，改判为其他人物'
+                    : '手动将此人脸标记为指定人物（即使系统未生成识别建议）'
                 "
                 @click.stop="picker = face"
               >
-                {{ isTagged(face) ? 'Reassign' : 'Tag as person' }}
+                {{ isTagged(face) ? '改判人物' : '标记为人物' }}
               </button>
             </div>
             <dl class="ins-facts">
-              <dt>Face</dt>
+              <dt>人脸 ID</dt>
               <dd class="mono">#{{ face.face_id }}</dd>
-              <dt>Detector</dt>
+              <dt>检测器</dt>
               <dd>{{ face.detector }}</dd>
-              <dt>Score</dt>
+              <dt>检测分</dt>
               <dd class="mono">
                 {{ fmtScore(face.det_score) }}
                 <span v-if="face.det_score_secondary != null" class="muted"
-                  >· 2nd {{ fmtScore(face.det_score_secondary) }}</span
+                  >· 次检 {{ fmtScore(face.det_score_secondary) }}</span
                 >
               </dd>
-              <dt>Quality</dt>
+              <dt>画质分</dt>
               <dd class="mono">{{ fmtScore(face.quality, 1) }}</dd>
-              <dt>Box</dt>
+              <dt>检测框</dt>
               <dd class="mono">
                 {{ Math.round(face.bbox.x) }},{{ Math.round(face.bbox.y) }} ·
                 {{ Math.round(face.bbox.w) }}×{{ Math.round(face.bbox.h) }}
               </dd>
-              <dt>Group</dt>
+              <dt>人脸分组</dt>
               <dd>
                 <template v-if="face.cluster">
-                  #{{ face.cluster.cluster_id }} ({{ face.cluster.size ?? '?' }} faces, run
-                  {{ face.cluster.run_id }})
+                  #{{ face.cluster.cluster_id }}（{{ face.cluster.size ?? '?' }} 张人脸，批次
+                  {{ face.cluster.run_id }}）
                   <template v-if="face.cluster.mapped_person_id != null">
                     →
                     <a
@@ -636,46 +653,46 @@ watch(() => [route.params.space, route.params.photoId], syncFromRoute)
                       face.cluster.mapped_person_name || face.cluster.mapped_person_id
                     }}</template>
                     <span v-if="face.cluster.vote_fraction != null" class="muted">
-                      · {{ (face.cluster.vote_fraction * 100).toFixed(0) }}% vote</span
+                      · {{ (face.cluster.vote_fraction * 100).toFixed(0) }}% 投票一致</span
                     >
                   </template>
                 </template>
-                <span v-else class="muted">not grouped</span>
+                <span v-else class="muted">未分组</span>
               </dd>
-              <dt>Embeddings</dt>
+              <dt>特征向量</dt>
               <dd>
-                <span v-if="!face.embeddings.length" class="muted">none</span>
+                <span v-if="!face.embeddings.length" class="muted">无</span>
                 <span v-else>{{
                   face.embeddings.map((e) => `${e.model} (${e.variant})`).join(', ')
                 }}</span>
               </dd>
-              <dt v-if="face.restored">Restored</dt>
+              <dt v-if="face.restored">画质修复</dt>
               <dd v-if="face.restored" class="mono">
-                disagreement {{ fmtScore(face.restore_disagreement) }}
+                差异度 {{ fmtScore(face.restore_disagreement) }}
               </dd>
-              <dt>Synology</dt>
+              <dt>群晖标注</dt>
               <dd>
                 <template v-if="face.syno">
                   <template v-if="face.syno.person_id != null">{{
                     face.syno.name || `#${face.syno.person_id}`
                   }}</template>
-                  <span v-else class="muted">boxed, unnamed</span>
+                  <span v-else class="muted">有框，未命名</span>
                   <span class="muted"> · IoU {{ face.syno.iou.toFixed(2) }}</span>
                 </template>
-                <span v-else class="muted">no box here</span>
+                <span v-else class="muted">此处无群晖人脸框</span>
               </dd>
-              <dt>Review</dt>
+              <dt>审核记录</dt>
               <dd>
-                <span v-if="!reviewFor.get(face.face_id)" class="muted">none</span>
-                <span v-else>{{ reviewFor.get(face.face_id)?.join(', ') }}</span>
+                <span v-if="!reviewFor.get(face.face_id)" class="muted">无</span>
+                <span v-else>{{ reviewFor.get(face.face_id)?.join('，') }}</span>
               </dd>
-              <dt>Pipeline</dt>
+              <dt>处理版本</dt>
               <dd class="mono">
                 {{ face.pipeline_version }}
                 <span
                   v-if="meta?.pipeline_version && meta.pipeline_version !== face.pipeline_version"
                   class="muted"
-                  >· stale</span
+                  >· 已过时</span
                 >
               </dd>
             </dl>
@@ -684,14 +701,14 @@ watch(() => [route.params.space, route.params.photoId], syncFromRoute)
       </section>
 
       <section v-if="report.syno_faces.length" class="card">
-        <h3>Synology faces</h3>
+        <h3>群晖原有人脸</h3>
         <table class="ins-table">
           <thead>
             <tr>
-              <th>Face</th>
-              <th>Person</th>
-              <th>Box (0–1)</th>
-              <th>Synced</th>
+              <th>人脸 ID</th>
+              <th>人物</th>
+              <th>人脸框 (0–1)</th>
+              <th>同步时间</th>
             </tr>
           </thead>
           <tbody>
@@ -705,7 +722,7 @@ watch(() => [route.params.space, route.params.photoId], syncFromRoute)
                   rel="noopener"
                   >{{ sf.name || sf.person_id }}</a
                 >
-                <span v-else class="muted">{{ sf.name || 'unnamed' }}</span>
+                <span v-else class="muted">{{ sf.name || '未命名' }}</span>
               </td>
               <td class="mono">
                 {{ sf.box.x.toFixed(3) }}, {{ sf.box.y.toFixed(3) }} ·
@@ -718,11 +735,11 @@ watch(() => [route.params.space, route.params.photoId], syncFromRoute)
       </section>
 
       <section v-if="otherReviewItems.length" class="card">
-        <h3>Other review items</h3>
-        <p class="muted">Queued items that name this photo but none of its current faces.</p>
+        <h3>其他审核条目</h3>
+        <p class="muted">涉及此照片、但未关联当前任意人脸的队列条目。</p>
         <ul class="ins-list">
           <li v-for="it in otherReviewItems" :key="it.item_id">
-            <span class="mono">#{{ it.item_id }}</span> {{ it.kind }} · {{ it.status }}
+            <span class="mono">#{{ it.item_id }}</span> {{ KIND_LABELS[it.kind] ?? it.kind }} · {{ STATUS_LABELS[it.status] ?? it.status }}
             <span v-if="it.confidence != null" class="muted"
               >· {{ fmtScore(it.confidence, 2) }}</span
             >
@@ -731,50 +748,50 @@ watch(() => [route.params.space, route.params.photoId], syncFromRoute)
       </section>
 
       <section class="card ins-meta">
-        <h3>Photo</h3>
+        <h3>照片信息</h3>
         <dl class="ins-facts">
-          <dt>Resolution</dt>
+          <dt>分辨率</dt>
           <dd class="mono">
             {{ report.photo.width ?? '?' }}×{{ report.photo.height ?? '?' }}
             <span class="muted"
-              >· frame used {{ activeFrame?.w ?? '?' }}×{{ activeFrame?.h ?? '?' }}
-              <template v-if="reframed">(re-framed)</template> · orientation
+              >· 实际画幅 {{ activeFrame?.w ?? '?' }}×{{ activeFrame?.h ?? '?' }}
+              <template v-if="reframed">（已换算）</template> · 方向值
               {{ report.photo.orientation ?? '—' }}<template v-if="rotation !== 0">
-                · boxes turned {{ rotation }}°</template
+                · 检测框已旋转 {{ rotation }}°</template
               ></span
             >
           </dd>
-          <dt>Size</dt>
+          <dt>文件大小</dt>
           <dd class="mono">{{ fmtBytes(report.photo.filesize) }}</dd>
-          <dt>Type</dt>
+          <dt>类型</dt>
           <dd>{{ report.photo.type || '—' }}</dd>
-          <dt>Cache key</dt>
+          <dt>缓存键</dt>
           <dd class="mono">{{ report.photo.cache_key || '—' }}</dd>
-          <dt>Hashes</dt>
+          <dt>哈希值</dt>
           <dd class="mono">
             sha256 {{ report.photo.sha256?.slice(0, 12) || '—' }} · pHash
             {{ report.photo.phash || '—' }}
           </dd>
-          <dt v-if="report.photo.similar_top_pick">Similar group</dt>
+          <dt v-if="report.photo.similar_top_pick">相似组</dt>
           <dd v-if="report.photo.similar_top_pick" class="mono">
-            top pick {{ report.photo.similar_top_pick }}
+            首选 {{ report.photo.similar_top_pick }}
           </dd>
-          <dt>Synced</dt>
+          <dt>同步时间</dt>
           <dd>{{ fmtTime(report.photo.synced_at) }}</dd>
-          <dt>Detection run</dt>
+          <dt>检测记录</dt>
           <dd>
             <template v-if="report.extract">
               {{ fmtTime(report.extract.processed_at) }} ·
-              {{ report.extract.face_count }} faces ·
+              {{ report.extract.face_count }} 张人脸 ·
               <span class="mono">{{ report.extract.pipeline_version }}</span>
-              <span v-if="report.extract.stale" class="muted"> · photo changed since</span>
+              <span v-if="report.extract.stale" class="muted"> · 照片此后发生变更</span>
             </template>
-            <span v-else class="muted">never</span>
+            <span v-else class="muted">尚未运行</span>
           </dd>
-          <dt>Thresholds</dt>
+          <dt>检测阈值</dt>
           <dd class="mono">
             SCRFD {{ report.detection.scrfd_score }} · YOLO {{ report.detection.yolo_score }} · NMS
-            {{ report.detection.nms_iou }} · cross {{ report.detection.cross_iou }} · min
+            {{ report.detection.nms_iou }} · 交叉验证 {{ report.detection.cross_iou }} · 最小人脸
             {{ report.detection.min_face_px }}px
           </dd>
         </dl>
@@ -784,15 +801,14 @@ watch(() => [route.params.space, route.params.photoId], syncFromRoute)
     <PersonPickerDialog
       v-if="picker"
       :mode="isTagged(picker) ? 'reassign' : 'assign'"
-      :source-label="`face #${picker.face_id}`"
+      :source-label="`人脸 #${picker.face_id}`"
       :source-crops="[picker.crop_url]"
       :space="report?.space"
       :source-key="picker.face_id"
       :note="
         isTagged(picker)
-          ? `Synology has this face on ${picker.syno?.name || '#' + picker.syno?.person_id}. ` +
-            'Queues a move to the person you pick — Apply writes it only with ' +
-            'reassignments enabled.'
+          ? `群晖照片当前将此人脸标记为 ${picker.syno?.name || '#' + picker.syno?.person_id}。` +
+            '确认后将加入待写回队列——需在「写回群晖」中勾选「改判人物」才会写入群晖。'
           : undefined
       "
       :busy="assigning"

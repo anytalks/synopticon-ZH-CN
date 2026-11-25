@@ -12,6 +12,7 @@ import ConfirmDialog from './components/ConfirmDialog.vue'
 import { useAuth } from './stores/auth'
 import { useJobs } from './stores/jobs'
 import { useTheme, type ThemeMode } from './composables/useTheme'
+import { phaseLabel } from './composables/useJobStream'
 import { jobLabel } from './utils/jobs'
 
 const route = useRoute()
@@ -27,17 +28,18 @@ const avatar = computed(() => (username.value ?? '?').charAt(0).toUpperCase())
 const themeOpen = ref(false)
 const userOpen = ref(false)
 
-// `Sync · sync.faces 99%` — the chip is the only progress indication on pages
+// `同步图库 · 同步人脸数据 99%` — the chip is the only progress indication on pages
 // that do not host a JobPanel, so it carries the phase and percentage the
 // listing already provides rather than a bare "running".
 const jobChipText = computed(() => {
   const j = jobs.running
   if (!j) return ''
   const label = jobLabel(j.name)
-  if (j.state === 'queued') return `${label} queued`
+  if (j.state === 'queued') return `${label} 排队中`
   const p = j.progress
-  if (!p?.phase) return `${label} running`
-  return p.pct === null ? `${label} · ${p.phase}` : `${label} · ${p.phase} ${p.pct}%`
+  if (!p?.phase) return `${label} 运行中`
+  const phase = phaseLabel(p.phase)
+  return p.pct === null ? `${label} · ${phase}` : `${label} · ${phase} ${p.pct}%`
 })
 
 function toggleTheme(): void {
@@ -89,7 +91,7 @@ onBeforeUnmount(() => {
 <template>
   <RouterView v-if="bare" />
   <template v-else>
-    <a class="skip-link" href="#main">Skip to content</a>
+    <a class="skip-link" href="#main">跳至正文内容</a>
     <div class="layout">
       <SidebarNav />
       <div class="content">
@@ -97,7 +99,7 @@ onBeforeUnmount(() => {
           <button
             class="icon-btn nav-toggle"
             type="button"
-            aria-label="Toggle navigation"
+            aria-label="展开或收起导航栏"
             @click="toggleNav"
           >
             &#9776;
@@ -119,16 +121,16 @@ onBeforeUnmount(() => {
               type="button"
               aria-haspopup="true"
               :aria-expanded="themeOpen"
-              title="Theme"
-              aria-label="Theme"
+              title="外观主题"
+              aria-label="外观主题"
               @click="toggleTheme"
             >
               &#9681;
             </button>
             <div class="menu-panel" role="menu">
-              <button role="menuitemradio" @click="chooseTheme('auto')">Auto</button>
-              <button role="menuitemradio" @click="chooseTheme('light')">Light</button>
-              <button role="menuitemradio" @click="chooseTheme('dark')">Dark</button>
+              <button role="menuitemradio" @click="chooseTheme('auto')">跟随系统</button>
+              <button role="menuitemradio" @click="chooseTheme('light')">浅色</button>
+              <button role="menuitemradio" @click="chooseTheme('dark')">深色</button>
             </div>
           </div>
           <div class="menu" :class="{ open: userOpen }" id="user-menu">
@@ -137,17 +139,17 @@ onBeforeUnmount(() => {
               type="button"
               aria-haspopup="true"
               :aria-expanded="userOpen"
-              aria-label="Account menu"
+              aria-label="账号菜单"
               @click="toggleUser"
             >
               {{ avatar }}
             </button>
             <div class="menu-panel" role="menu">
-              <div class="menu-label">{{ username ?? 'not signed in' }}</div>
+              <div class="menu-label">{{ username ?? '未登录' }}</div>
               <RouterLink role="menuitem" to="/settings" @click="userOpen = false"
-                >Settings</RouterLink
+                >系统设置</RouterLink
               >
-              <button type="button" role="menuitem" @click="doLogout">Sign out</button>
+              <button type="button" role="menuitem" @click="doLogout">退出登录</button>
             </div>
           </div>
         </header>

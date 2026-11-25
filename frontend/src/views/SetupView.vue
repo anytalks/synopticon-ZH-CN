@@ -24,12 +24,12 @@ const current = ref(0)
 const status = ref<SetupStatus | null>(null)
 
 const STEP_LABELS: { label: string; mark: string }[] = [
-  { label: 'Account', mark: '1' },
-  { label: 'NAS', mark: '2' },
-  { label: 'Storage', mark: '3' },
-  { label: 'Models', mark: '4' },
-  { label: 'Sync', mark: '5' },
-  { label: 'Done', mark: '✓' },
+  { label: '账号', mark: '1' },
+  { label: '群晖连接', mark: '2' },
+  { label: '存储', mark: '3' },
+  { label: '模型', mark: '4' },
+  { label: '同步', mark: '5' },
+  { label: '完成', mark: '✓' },
 ]
 
 function dotState(n: number): '' | 'current' | 'done' {
@@ -82,7 +82,7 @@ async function createAccount(): Promise<void> {
     goto(1)
   } catch (ex) {
     accountError.value =
-      (ex instanceof ApiError && ex.message) || 'Could not create account.'
+      (ex instanceof ApiError && ex.message) || '无法创建管理员账号。'
   } finally {
     accountBusy.value = false
   }
@@ -122,10 +122,10 @@ async function testConnection(): Promise<void> {
     })
     probe.value = result
     nasSaveEnabled.value = !!result.ok
-    if (result.ok) toast('Connection OK', 'ok')
-    else toast(result.error || 'Connection failed', 'error')
+    if (result.ok) toast('连接测试成功', 'ok')
+    else toast(result.error || '连接失败', 'error')
   } catch (ex) {
-    toast((ex instanceof Error && ex.message) || 'Test failed', 'error')
+    toast((ex instanceof Error && ex.message) || '连接测试失败', 'error')
   } finally {
     testBusy.value = false
   }
@@ -151,7 +151,7 @@ async function saveNas(): Promise<void> {
       goto(2)
       return
     }
-    toast((ex instanceof Error && ex.message) || 'Could not save NAS config', 'error')
+    toast((ex instanceof Error && ex.message) || '保存群晖连接配置失败', 'error')
   }
 }
 
@@ -164,6 +164,12 @@ const storage = reactive({
 })
 const storageResult = ref<StorageCheckResult | null>(null)
 
+function storageDirLabel(key: string): string {
+  if (key === 'data_dir') return '数据目录'
+  if (key === 'models_dir') return '模型目录'
+  return key
+}
+
 async function checkStorage(): Promise<void> {
   try {
     storageResult.value = await postJSON<StorageCheckResult>('/api/setup/check-storage', {
@@ -171,7 +177,7 @@ async function checkStorage(): Promise<void> {
       models_dir: storage.modelsDir.trim(),
     })
   } catch (ex) {
-    toast((ex instanceof Error && ex.message) || 'Check failed', 'error')
+    toast((ex instanceof Error && ex.message) || '目录检测失败', 'error')
   }
 }
 
@@ -191,7 +197,7 @@ async function saveStorage(): Promise<void> {
       goto(3)
       return
     }
-    toast((ex instanceof Error && ex.message) || 'Could not save storage config', 'error')
+    toast((ex instanceof Error && ex.message) || '保存存储配置失败', 'error')
   }
 }
 
@@ -224,7 +230,7 @@ async function downloadModels(): Promise<void> {
   try {
     await modelsPanel.value?.start('models-download', {})
   } catch (ex) {
-    toast((ex instanceof Error && ex.message) || 'Could not start download', 'error')
+    toast((ex instanceof Error && ex.message) || '无法启动模型下载', 'error')
     downloadBusy.value = false
   }
 }
@@ -242,7 +248,7 @@ function onModelsDone(detail: DoneDetail): void {
         modelsReady.value = true
         modelsMissing.value = []
         showContinueAnyway.value = false
-        toast('Models ready', 'ok')
+        toast('模型已就绪', 'ok')
       } else {
         showMissingModels(s.models_missing)
       }
@@ -266,7 +272,7 @@ async function runSync(): Promise<void> {
   try {
     await syncPanel.value?.start('sync', {})
   } catch (ex) {
-    toast((ex instanceof Error && ex.message) || 'Could not start sync', 'error')
+    toast((ex instanceof Error && ex.message) || '无法启动同步任务', 'error')
     syncBusy.value = false
   }
 }
@@ -276,7 +282,7 @@ function onSyncDone(detail: DoneDetail): void {
   if (st === null) return
   if (st === 'succeeded') {
     syncNext.value = true
-    toast('Sync complete', 'ok')
+    toast('首次同步已完成', 'ok')
   }
 }
 
@@ -320,9 +326,9 @@ onMounted(async () => {
         <img class="brand-mark" src="/img/logo.svg" alt="" aria-hidden="true" />
         <span class="brand-name">Synopticon</span>
       </div>
-      <h1 class="auth-title" id="wizard-heading">Setup wizard</h1>
+      <h1 class="auth-title" id="wizard-heading">初始化向导</h1>
 
-      <ol class="wizard-steps" aria-label="Setup progress">
+      <ol class="wizard-steps" aria-label="初始化进度">
         <li
           v-for="(s, i) in STEP_LABELS"
           :key="i"
@@ -336,14 +342,14 @@ onMounted(async () => {
       <section
         class="wizard-step"
         :class="{ active: current === 0 }"
-        aria-label="Create admin account"
+        aria-label="创建管理员账号"
       >
-        <p class="step-title">Create your admin account</p>
-        <p class="muted">Synopticon needs one admin account before it can do anything else.</p>
+        <p class="step-title">创建管理员账号</p>
+        <p class="muted">使用 Synopticon 前，请先创建一个管理员账号。</p>
         <p v-if="accountError" class="auth-error" role="alert">{{ accountError }}</p>
         <form class="auth-form" @submit.prevent="createAccount">
           <div class="field">
-            <label for="su-username">Username</label>
+            <label for="su-username">用户名</label>
             <input
               type="text"
               id="su-username"
@@ -353,7 +359,7 @@ onMounted(async () => {
             />
           </div>
           <div class="field">
-            <label for="su-password">Password</label>
+            <label for="su-password">密码</label>
             <input
               type="password"
               id="su-password"
@@ -364,7 +370,7 @@ onMounted(async () => {
             />
           </div>
           <button type="submit" class="btn btn-action btn-block" :disabled="accountBusy">
-            Create account &amp; continue
+            创建账号并继续
           </button>
         </form>
       </section>
@@ -373,12 +379,12 @@ onMounted(async () => {
       <section
         class="wizard-step"
         :class="{ active: current === 1 }"
-        aria-label="NAS connection"
+        aria-label="群晖连接"
       >
-        <p class="step-title">Connect to your NAS</p>
-        <p class="muted">Read-only. Testing the connection never changes anything on the NAS.</p>
+        <p class="step-title">连接到群晖 NAS</p>
+        <p class="muted">仅执行只读检测，测试连接不会对群晖 NAS 做出任何更改。</p>
         <div class="field">
-          <label for="nas-url">NAS URL</label>
+          <label for="nas-url">群晖地址 (URL)</label>
           <input
             type="text"
             id="nas-url"
@@ -389,11 +395,11 @@ onMounted(async () => {
         </div>
         <div class="field-row">
           <div class="field">
-            <label for="nas-account">Account</label>
+            <label for="nas-account">账号</label>
             <input type="text" id="nas-account" v-model="nas.account" autocomplete="off" />
           </div>
           <div class="field">
-            <label for="nas-password">Password</label>
+            <label for="nas-password">密码</label>
             <input
               type="password"
               id="nas-password"
@@ -403,33 +409,33 @@ onMounted(async () => {
           </div>
         </div>
         <div class="field">
-          <label for="nas-otp">2FA code (optional)</label>
+          <label for="nas-otp">两步验证码（选填）</label>
           <input
             type="text"
             id="nas-otp"
             v-model="nas.otp"
             inputmode="numeric"
             autocomplete="off"
-            placeholder="only if 2FA is enabled"
+            placeholder="仅开启两步验证时填写"
           />
         </div>
         <div class="field field-inline">
           <input type="checkbox" id="nas-verify-tls" v-model="nas.verifyTls" />
-          <label for="nas-verify-tls">Verify TLS certificate (uncheck for self-signed)</label>
+          <label for="nas-verify-tls">验证 TLS 证书（如使用自签名证书请取消勾选）</label>
         </div>
         <div class="field">
-          <span class="muted">Spaces to include</span>
+          <span class="muted">包含的相册空间</span>
           <div class="field-inline">
             <input type="checkbox" id="nas-space-personal" v-model="nas.spacePersonal" />
-            <label for="nas-space-personal">Personal</label>
+            <label for="nas-space-personal">个人空间</label>
           </div>
           <div class="field-inline">
             <input type="checkbox" id="nas-space-shared" v-model="nas.spaceShared" />
-            <label for="nas-space-shared">Shared</label>
+            <label for="nas-space-shared">共享空间</label>
           </div>
         </div>
         <button type="button" class="btn" :disabled="testBusy" @click="testConnection">
-          {{ testBusy ? 'Testing…' : 'Test connection' }}
+          {{ testBusy ? '测试中…' : '测试连接' }}
         </button>
         <ul v-if="probe" class="probe-steps">
           <li
@@ -443,7 +449,7 @@ onMounted(async () => {
           </li>
         </ul>
         <div class="wizard-actions">
-          <button type="button" class="btn btn-ghost" @click="goto(current - 1)">Back</button>
+          <button type="button" class="btn btn-ghost" @click="goto(current - 1)">上一步</button>
           <div class="spacer"></div>
           <button
             type="button"
@@ -451,7 +457,7 @@ onMounted(async () => {
             :disabled="!nasSaveEnabled"
             @click="saveNas"
           >
-            Save &amp; continue
+            保存并继续
           </button>
         </div>
       </section>
@@ -460,42 +466,42 @@ onMounted(async () => {
       <section
         class="wizard-step"
         :class="{ active: current === 2 }"
-        aria-label="Storage"
+        aria-label="存储位置"
       >
-        <p class="step-title">Storage locations</p>
-        <p class="muted">Where Synopticon keeps its database, crops and downloaded originals.</p>
+        <p class="step-title">存储路径设置</p>
+        <p class="muted">设置 Synopticon 存放数据库、人脸头像及原图缓存的目录。</p>
         <div class="field">
-          <label for="st-data-dir">Data directory</label>
+          <label for="st-data-dir">数据目录</label>
           <input type="text" id="st-data-dir" v-model="storage.dataDir" />
         </div>
         <div class="field">
-          <label for="st-models-dir">Models directory</label>
+          <label for="st-models-dir">模型目录</label>
           <input type="text" id="st-models-dir" v-model="storage.modelsDir" />
         </div>
         <div class="field-inline">
           <input type="checkbox" id="st-keep-originals" v-model="storage.keepOriginals" />
-          <label for="st-keep-originals">Keep downloaded originals on disk</label>
+          <label for="st-keep-originals">在本地磁盘保留已下载的原图</label>
         </div>
         <div class="field">
-          <label for="st-cache-gb">Originals cache (GB)</label>
+          <label for="st-cache-gb">原图缓存上限 (GB)</label>
           <input type="number" id="st-cache-gb" min="1" step="1" v-model="storage.cacheGb" />
         </div>
-        <button type="button" class="btn" @click="checkStorage">Check writability</button>
+        <button type="button" class="btn" @click="checkStorage">检测目录写入权限</button>
         <div v-if="storageResult" class="storage-result">
           <div
             v-for="(d, key) in storageResult.dirs"
             :key="key"
             :class="d.ok ? 'ok' : 'bad'"
           >
-            {{ (d.ok ? '✓ ' : '✗ ') + key + ': ' + d.detail
-            }}<template v-if="d.free_gb != null"> ({{ d.free_gb }} GB free)</template>
+            {{ (d.ok ? '✓ ' : '✗ ') + storageDirLabel(String(key)) + '：' + d.detail
+            }}<template v-if="d.free_gb != null">（可用空间 {{ d.free_gb }} GB）</template>
           </div>
         </div>
         <div class="wizard-actions">
-          <button type="button" class="btn btn-ghost" @click="goto(current - 1)">Back</button>
+          <button type="button" class="btn btn-ghost" @click="goto(current - 1)">上一步</button>
           <div class="spacer"></div>
           <button type="button" class="btn btn-action" @click="saveStorage">
-            Save &amp; continue
+            保存并继续
           </button>
         </div>
       </section>
@@ -504,29 +510,27 @@ onMounted(async () => {
       <section
         class="wizard-step"
         :class="{ active: current === 3 }"
-        aria-label="Model download"
+        aria-label="下载模型"
       >
-        <p class="step-title">Download face models</p>
-        <p class="muted">Detection and embedding weights (a few hundred MB). This can take a while.</p>
+        <p class="step-title">下载人脸识别模型</p>
+        <p class="muted">将下载人脸检测与特征提取模型权重（约数百 MB），可能需要几分钟时间。</p>
         <JobPanel ref="modelsPanel" @done="onModelsDone" />
         <div v-if="modelsMissing.length" class="models-missing" role="alert">
-          <p class="models-missing-title">Some models could not be downloaded</p>
+          <p class="models-missing-title">部分模型无法自动下载</p>
           <p>
-            AdaFace and MagFace cannot be downloaded automatically — their weights are not
-            redistributed. Export them manually (see <strong>docs/models.md</strong>), then
-            re-run the download, or continue and add them before detecting faces.
+            AdaFace 与 MagFace 模型权重不支持自动再分发，无法直接下载。请参照 <strong>docs/models.md</strong> 手动导出后重试，或先继续完成向导，在执行人脸检测前补齐即可。
           </p>
           <p class="muted">
-            First sync works without any models; detecting faces later requires all five.
+            首次同步图库无需模型；后续进行人脸检测与提取时需要全部五个模型。
           </p>
           <ul>
             <li v-for="key in modelsMissing" :key="key"><code>{{ key }}</code></li>
           </ul>
         </div>
         <div class="wizard-actions">
-          <button type="button" class="btn btn-ghost" @click="goto(current - 1)">Back</button>
+          <button type="button" class="btn btn-ghost" @click="goto(current - 1)">上一步</button>
           <button type="button" class="btn" :disabled="downloadBusy" @click="downloadModels">
-            Download models
+            下载模型
           </button>
           <div class="spacer"></div>
           <button
@@ -535,10 +539,10 @@ onMounted(async () => {
             class="btn btn-ghost"
             @click="goto(4)"
           >
-            Continue anyway
+            暂时忽略并继续
           </button>
           <button type="button" class="btn btn-action" :disabled="!modelsReady" @click="goto(4)">
-            Continue
+            继续
           </button>
         </div>
       </section>
@@ -547,25 +551,25 @@ onMounted(async () => {
       <section
         class="wizard-step"
         :class="{ active: current === 4 }"
-        aria-label="First sync"
+        aria-label="首次同步"
       >
-        <p class="step-title">Run your first sync</p>
+        <p class="step-title">执行首次图库同步</p>
         <p class="muted">
-          Pull the photo index from the NAS. You can skip this and run it later from the dashboard.
+          从群晖 NAS 拉取照片索引。你也可以先跳过此步，稍后在概览或处理流程页面运行。
         </p>
         <JobPanel ref="syncPanel" @done="onSyncDone" />
         <div class="wizard-actions">
-          <button type="button" class="btn btn-ghost" @click="goto(current - 1)">Back</button>
-          <button type="button" class="btn" :disabled="syncBusy" @click="runSync">Run sync</button>
+          <button type="button" class="btn btn-ghost" @click="goto(current - 1)">上一步</button>
+          <button type="button" class="btn" :disabled="syncBusy" @click="runSync">开始同步</button>
           <div class="spacer"></div>
-          <button type="button" class="btn btn-ghost" @click="goto(LAST_STEP)">Skip</button>
+          <button type="button" class="btn btn-ghost" @click="goto(LAST_STEP)">跳过</button>
           <button
             type="button"
             class="btn btn-action"
             :disabled="!syncNext"
             @click="goto(LAST_STEP)"
           >
-            Continue
+            继续
           </button>
         </div>
       </section>
@@ -574,14 +578,14 @@ onMounted(async () => {
       <section
         class="wizard-step"
         :class="{ active: current === 5 }"
-        aria-label="Setup complete"
+        aria-label="初始化完成"
       >
-        <p class="step-title">You&rsquo;re all set</p>
+        <p class="step-title">全部配置已完成</p>
         <p class="muted">
-          Synopticon is configured. Head to the dashboard to run the pipeline and review results.
+          Synopticon 已准备就绪。前往概览页面运行处理流程并审核人脸识别建议。
         </p>
         <button type="button" class="btn btn-action btn-block" @click="router.push('/')">
-          Go to dashboard
+          进入概览
         </button>
       </section>
     </div>

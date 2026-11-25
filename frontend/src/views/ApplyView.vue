@@ -18,9 +18,9 @@ import type { DoneDetail } from '../composables/useJobStream'
 const MERGE_NAMED_PHRASE = 'merge named people'
 
 const SPACES: [string, string][] = [
-  ['', 'both (default)'],
-  ['personal', 'personal'],
-  ['shared', 'shared'],
+  ['', '全部空间（默认）'],
+  ['personal', '个人空间'],
+  ['shared', '共享空间'],
 ]
 
 interface KindDef {
@@ -29,17 +29,32 @@ interface KindDef {
   danger: boolean
 }
 const KINDS: KindDef[] = [
-  { k: 'assign', label: 'assign — routine label assignments', danger: false },
-  { k: 'low_confidence', label: 'low_confidence — low-confidence assignments', danger: false },
-  { k: 'new_person', label: 'new_person — create new persons', danger: false },
-  { k: 'reassign', label: 'reassign — move a face to another person', danger: false },
-  { k: 'merge', label: 'merge — join two people (irreversible)', danger: true },
+  { k: 'assign', label: '归属认领 — 常规人脸归属标记', danger: false },
+  { k: 'low_confidence', label: '低置信度复核 — 置信度较低的人脸归属标记', danger: false },
+  { k: 'new_person', label: '发现新人物 — 创建新的人物分组', danger: false },
+  { k: 'reassign', label: '改判人物 — 将人脸从原人物改判给其他人物', danger: false },
+  { k: 'merge', label: '合并未命名分组 — 合并两个人物分组（不可撤销）', danger: true },
   {
     k: 'merge_named',
-    label: 'merge_named — join two NAMED people (destroys a label)',
+    label: '合并已命名人物 — 合并两个已命名人物（不可撤销，会移除其中一个名称）',
     danger: true,
   },
 ]
+
+const STAT_LABELS: Record<string, string> = {
+  dry_run: '仅预演',
+  applied: '已写回',
+  succeeded: '成功',
+  failed: '失败',
+  skipped: '已跳过',
+  total: '总计',
+  planned: '计划执行',
+  errors: '错误数',
+  assigned: '归属认领',
+  reassigned: '改判人物',
+  merged: '合并分组',
+  created: '新建人物',
+}
 
 const checked = reactive<Record<string, boolean>>(
   Object.fromEntries(KINDS.map((k) => [k.k, false])),
@@ -72,8 +87,8 @@ const applyEnabled = computed(
 )
 const applyHint = computed(() =>
   applyEnabled.value
-    ? 'Preview succeeded for this kind-set — Apply is enabled.'
-    : 'Run a preview for the selected kinds to enable Apply.',
+    ? '当前所选类型的预演已通过，现可执行写回群晖。'
+    : '请先对当前所选类型执行一次预演，通过后即可启用写回群晖。',
 )
 
 function baseParams(kinds: string[]): Record<string, unknown> {
@@ -105,7 +120,7 @@ function preview(): void {
   showAudit.value = false
   panel.value
     ?.start('apply', params)
-    .catch((e: Error) => toast(e.message || 'Preview failed', 'error'))
+    .catch((e: Error) => toast(e.message || '预演失败', 'error'))
 }
 
 function submitApply(confirmPhrase?: string): void {
@@ -120,9 +135,9 @@ function submitApply(confirmPhrase?: string): void {
   panel.value?.start('apply', params, extra).catch((e: unknown) => {
     if (e instanceof ApiError && e.status === 428) {
       const req = (e.body?.requirement as string) || ''
-      toast('Consent required: ' + req, 'error')
+      toast('需要安全确认：' + req, 'error')
     } else {
-      toast((e as Error).message || 'Apply failed', 'error')
+      toast((e as Error).message || '写回失败', 'error')
     }
   })
 }
@@ -130,11 +145,11 @@ function submitApply(confirmPhrase?: string): void {
 async function apply(): Promise<void> {
   const kinds = selectedKinds.value
   if (kinds.includes('reassign') && !ackReassign.value) {
-    toast('Acknowledge the reassign warning first.', 'error')
+    toast('请先勾选确认「改判人物」的风险提示。', 'error')
     return
   }
   if (kinds.includes('merge') && !ackMerge.value) {
-    toast('Acknowledge the merge warning first.', 'error')
+    toast('请先勾选确认「合并未命名分组」的不可撤销风险提示。', 'error')
     return
   }
   if (kinds.includes('merge_named')) {
@@ -148,17 +163,17 @@ async function apply(): Promise<void> {
       const pairs = res.pairs || []
       pairsText = pairs.length
         ? pairs.map((p) => `${p.label_a} ↔ ${p.label_b}`).join(' · ')
-        : 'No approved named↔named merges are queued.'
+        : '当前队列中没有已通过的已命名人物合并条目。'
     } catch {
       /* still allow typed confirm even if the pair list is unavailable */
     }
     const ok = await confirm({
-      title: 'Confirm named ↔ named merges',
+      title: '确认合并已命名人物',
       message:
-        'The following already-named people will be merged, permanently destroying one human label per pair: ' +
+        '以下已命名人物将被合并，每对合并后将永久移除其中一个已有人物名称：' +
         pairsText,
       phrase: MERGE_NAMED_PHRASE,
-      okLabel: 'Apply named merges',
+      okLabel: '执行已命名人物合并',
     })
     if (ok) submitApply(MERGE_NAMED_PHRASE)
     return
@@ -199,58 +214,55 @@ onMounted(() => {
 <template>
   <div class="page">
     <div class="card">
-      <h2>Apply corrections</h2>
+      <h2>写回修正到群晖</h2>
       <p class="muted">
-        Preview is a free dry run. Applying to the NAS is gated per correction kind; merges are
-        irreversible.
+        「预演」不会修改群晖照片，可随时安全预览；实际写回群晖 NAS 会按修正类型分级校验，合并操作不可撤销。
       </p>
 
-      <h3 style="margin-top: var(--sp-3)">Kinds</h3>
+      <h3 style="margin-top: var(--sp-3)">修正类型</h3>
       <div class="kinds">
         <div v-for="kd in KINDS" :key="kd.k" class="kind-row">
           <label :class="{ 'kind-danger': kd.danger }">
             <input type="checkbox" v-model="checked[kd.k]" /> {{ kd.label }}
           </label>
-          <span class="kind-count badge">{{ counts[kd.k] || 0 }} approved</span>
+          <span class="kind-count badge">{{ counts[kd.k] || 0 }} 条已通过</span>
         </div>
       </div>
 
       <div class="scope-row">
         <span
-          ><label for="apply-space">Space</label>
+          ><label for="apply-space">空间范围</label>
           <select class="select" id="apply-space" v-model="space">
             <option v-for="[v, l] in SPACES" :key="v" :value="v">{{ l }}</option>
           </select></span
         >
         <span
-          ><label for="apply-person">Person id</label>
+          ><label for="apply-person">人物 ID</label>
           <input
             class="input input-sm"
             id="apply-person"
             type="number"
             min="1"
-            placeholder="all"
+            placeholder="全部"
             v-model="personId"
         /></span>
       </div>
 
       <div v-if="showReassignConsent" class="consent-box">
         <label
-          ><input type="checkbox" v-model="ackReassign" /> I understand this moves face labels a
-          human can see in Photos (reassign).</label
+          ><input type="checkbox" v-model="ackReassign" /> 我已知晓此操作将修改群晖照片中可见的人脸归属标签（改判人物）。</label
         >
       </div>
       <div v-if="showMergeConsent" class="consent-box">
         <label
-          ><input type="checkbox" v-model="ackMerge" /> I understand merges are irreversible
-          (merge).</label
+          ><input type="checkbox" v-model="ackMerge" /> 我已知晓合并人物操作不可撤销（合并未命名分组）。</label
         >
       </div>
 
       <div class="apply-actions">
-        <button type="button" class="btn" @click="preview">Preview (dry run)</button>
+        <button type="button" class="btn" @click="preview">预演（不修改群晖）</button>
         <button type="button" class="btn btn-danger" :disabled="!applyEnabled" @click="apply">
-          Apply to NAS
+          写回群晖 NAS
         </button>
       </div>
       <p class="muted">{{ applyHint }}</p>
@@ -259,23 +271,23 @@ onMounted(() => {
     <JobPanel ref="panel" @done="onDone" />
 
     <div v-if="resultStats" class="card result-stats">
-      <h3>Last result</h3>
+      <h3>上次执行结果</h3>
       <dl>
         <template v-for="(v, k) in resultStats" :key="k">
-          <dt>{{ k }}</dt>
+          <dt>{{ STAT_LABELS[String(k)] ?? k }}</dt>
           <dd>{{ v }}</dd>
         </template>
       </dl>
     </div>
 
     <div v-if="showAudit" class="card" style="margin-top: var(--sp-4)">
-      <h3>Applied to NAS</h3>
+      <h3>已写回群晖的变更记录</h3>
       <table class="data">
         <thead>
           <tr>
             <th></th>
-            <th>Action</th>
-            <th>Details</th>
+            <th>操作</th>
+            <th>详情</th>
           </tr>
         </thead>
         <tbody>

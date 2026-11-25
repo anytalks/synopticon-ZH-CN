@@ -2,7 +2,7 @@
 // numbers: every one accepts null and renders an em dash for it.
 
 export function num(n: number | null | undefined): string {
-  return n == null ? '—' : n.toLocaleString()
+  return n == null ? '—' : n.toLocaleString('zh-CN')
 }
 
 /** 0..1 fraction → "5.2%"; one decimal under 10%, whole numbers above. */
@@ -26,29 +26,29 @@ export function fmtBytes(n: number | null | undefined): string {
   return (i === 0 ? v : v.toFixed(1)) + ' ' + u[i]
 }
 
-/** Seconds → "3d 4h", "2h 15m", "4m 10s", "12s". Two units at most. */
+/** Seconds → "3天 4小时", "2小时 15分", "4分 10秒", "12秒". Two units at most. */
 export function fmtDuration(seconds: number | null | undefined): string {
   if (seconds == null) return '—'
   let s = Math.max(0, Math.round(seconds))
-  if (s < 60) return s + 's'
+  if (s < 60) return `${s}秒`
   const d = Math.floor(s / 86400)
   s -= d * 86400
   const h = Math.floor(s / 3600)
   s -= h * 3600
   const m = Math.floor(s / 60)
   s -= m * 60
-  if (d) return h ? `${d}d ${h}h` : `${d}d`
-  if (h) return m ? `${h}h ${m}m` : `${h}h`
-  return s ? `${m}m ${s}s` : `${m}m`
+  if (d) return h ? `${d}天 ${h}小时` : `${d}天`
+  if (h) return m ? `${h}小时 ${m}分` : `${h}小时`
+  return s ? `${m}分 ${s}秒` : `${m}分`
 }
 
 export function fmtDate(ts: number | null | undefined): string {
-  return ts ? new Date(ts * 1000).toLocaleDateString() : '—'
+  return ts ? new Date(ts * 1000).toLocaleDateString('zh-CN') : '—'
 }
 
 export function fmtMonthOf(ts: number | null | undefined): string {
   return ts
-    ? new Date(ts * 1000).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+    ? new Date(ts * 1000).toLocaleDateString('zh-CN', { month: 'short', year: 'numeric' })
     : '—'
 }
 
@@ -57,7 +57,7 @@ export function fmtMonthOf(ts: number | null | undefined): string {
  * they are rendered in UTC to show the date the photo was actually taken.
  */
 export function fmtTakenDate(ts: number | null | undefined): string {
-  return ts ? new Date(ts * 1000).toLocaleDateString(undefined, { timeZone: 'UTC' }) : '—'
+  return ts ? new Date(ts * 1000).toLocaleDateString('zh-CN', { timeZone: 'UTC' }) : '—'
 }
 
 /** 'YYYY-MM-DD' → a locale date, without a timezone shift. */
@@ -65,21 +65,21 @@ export function fmtDay(day: string | null | undefined): string {
   if (!day) return '—'
   const [y, m, d] = day.split('-').map(Number)
   if (!y || !m || !d) return day
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, { timeZone: 'UTC' })
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('zh-CN', { timeZone: 'UTC' })
 }
 
-/** 'YYYY-MM' → "Mar 2026". */
+/** 'YYYY-MM' → "2026年3月". */
 export function fmtMonth(month: string): string {
   const [y, m] = month.split('-').map(Number)
   if (!y || !m) return month
-  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString(undefined, {
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('zh-CN', {
     month: 'short',
     year: 'numeric',
     timeZone: 'UTC',
   })
 }
 
-/** 1,284 → "1.3K" for axis ticks. */
+/** 12,840 → "1.3万" for axis ticks. */
 export function compact(n: number): string {
-  return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n)
+  return new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(n)
 }

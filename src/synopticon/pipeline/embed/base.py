@@ -62,7 +62,30 @@ def l2_normalize(vecs: np.ndarray, eps: float = 1e-12) -> np.ndarray:
     return (vecs / np.maximum(norms, eps)).astype(np.float32)
 
 
+def _uses_coreml(session) -> bool:
+    get_providers = getattr(session, "get_providers", None)
+    if get_providers is None:
+        return False
+    try:
+        return "CoreMLExecutionProvider" in get_providers()
+    except Exception:  # noqa: BLE001 - mock sessions in tests
+        return False
+
+
 def run_session(session, input_name: str, blob: np.ndarray) -> np.ndarray:
     """Run the ONNX session and return the first output as (N, dim) float32."""
+    # CoreML MLProgram re-specializes on every batch-size change (~150-180 ms),
+    # making variable per-photo face counts slower than CPU. Running batch=1
+    # locks the input shape at (1, 3, 112, 112) (~9 ms/face, >5x vs CPU, zero
+    # recompile spikes, and flat memory).
+    if blob.shape[0] > 1 and _uses_coreml(session):
+        parts = [
+            np.asarray(
+                session.run(None, {input_name: np.ascontiguousarray(blob[i : i + 1])})[0],
+                dtype=np.float32,
+            ).reshape(1, -1)
+            for i in range(blob.shape[0])
+        ]
+        return np.concatenate(parts, axis=0)
     out = session.run(None, {input_name: blob})[0]
     return np.asarray(out, dtype=np.float32).reshape(blob.shape[0], -1)

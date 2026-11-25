@@ -31,21 +31,21 @@ const rows = computed<Row[]>(() => {
   const i = info.value
   if (!i) return []
   const cores =
-    `${i.cpu.available_cores} usable · ${i.cpu.physical_cores} physical` +
-    (i.cpu.cgroup_quota != null ? ` · cgroup quota ${i.cpu.cgroup_quota}` : '')
+    `${i.cpu.available_cores} 可用核 · ${i.cpu.physical_cores} 物理核` +
+    (i.cpu.cgroup_quota != null ? ` · cgroup 配额 ${i.cpu.cgroup_quota}` : '')
   return [
-    { label: 'Version', value: 'v' + i.version },
+    { label: '软件版本', value: 'v' + i.version },
     {
-      label: 'Pipeline version',
-      value: i.pipeline_version ?? (i.models_ready ? 'unknown' : 'model weights missing'),
+      label: '处理流程版本',
+      value: i.pipeline_version ?? (i.models_ready ? '未知' : '缺少模型权重'),
       mono: i.pipeline_version != null,
     },
-    { label: 'Python', value: i.python },
-    { label: 'Platform', value: i.platform },
-    { label: 'CPU', value: cores },
-    { label: 'Data directory', value: i.paths.data_dir, mono: true },
-    { label: 'Models directory', value: i.paths.models_dir, mono: true },
-    { label: 'Database', value: i.paths.db_path, mono: true },
+    { label: 'Python 版本', value: i.python },
+    { label: '运行平台', value: i.platform },
+    { label: '处理器 (CPU)', value: cores },
+    { label: '数据目录', value: i.paths.data_dir, mono: true },
+    { label: '模型目录', value: i.paths.models_dir, mono: true },
+    { label: '数据库路径', value: i.paths.db_path, mono: true },
   ]
 })
 
@@ -88,27 +88,25 @@ onMounted(async () => {
       <div>
         <h2>Synopticon <span class="muted" v-if="version">v{{ version }}</span></h2>
         <p class="muted">
-          Supplements Synology Photos' face recognition: syncs a photo library from a NAS, runs an
-          ensemble face pipeline, groups faces by person, cross-references them against Synology's own
-          person labels, and writes approved corrections back.
+          为群晖照片 (Synology Photos) 提供增强的人脸识别辅助工具：从 NAS 同步图库，运行多模型集成检测与特征提取流程，按人物聚类分组并与群晖现有人物标签交叉比对，经人工审核后将修正结果安全写回群晖。
         </p>
         <div class="cta-row">
           <a class="btn btn-action" :href="repo" target="_blank" rel="noopener noreferrer"
-            >View on GitHub</a
+            >访问 GitHub 仓库</a
           >
           <a
             class="btn btn-ghost"
             :href="repo + '/issues/new'"
             target="_blank"
             rel="noopener noreferrer"
-            >Report an issue</a
+            >反馈问题</a
           >
           <a
             class="btn btn-ghost"
             :href="repo + '/blob/main/LICENSE'"
             target="_blank"
             rel="noopener noreferrer"
-            >License</a
+            >开源许可证</a
           >
         </div>
       </div>
@@ -116,15 +114,15 @@ onMounted(async () => {
 
     <section class="card about-card">
       <div class="card-head">
-        <h3>Build &amp; environment</h3>
+        <h3>构建与运行环境</h3>
         <button
           v-if="info"
           class="btn btn-sm"
           type="button"
           @click="copyReport"
-          :aria-label="'Copy environment details'"
+          :aria-label="'复制环境信息'"
         >
-          {{ copied ? 'Copied' : 'Copy for bug report' }}
+          {{ copied ? '已复制' : '复制用于问题反馈' }}
         </button>
       </div>
       <table v-if="info" class="data about-table">
@@ -135,12 +133,12 @@ onMounted(async () => {
           </tr>
         </tbody>
       </table>
-      <p v-else-if="loaded" class="muted">Environment details are unavailable.</p>
-      <p v-else class="muted">Loading…</p>
+      <p v-else-if="loaded" class="muted">暂时无法获取环境信息。</p>
+      <p v-else class="muted">加载中…</p>
     </section>
 
     <section class="card about-card" v-if="packages.length">
-      <h3>Installed components</h3>
+      <h3>已安装依赖组件</h3>
       <table class="data about-table">
         <tbody>
           <tr v-for="[name, v] in packages" :key="name">

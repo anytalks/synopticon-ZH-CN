@@ -18,7 +18,26 @@ const loaded = ref(false)
 const { state: jobs } = useJobs()
 
 function num(n: unknown): string {
-  return (Number(n) || 0).toLocaleString()
+  return (Number(n) || 0).toLocaleString('zh-CN')
+}
+
+function spaceLabel(sp: string): string {
+  if (sp === 'personal') return '个人空间'
+  if (sp === 'shared') return '共享空间'
+  return sp
+}
+
+const REVIEW_STATUS_LABELS: Record<string, string> = {
+  pending: '待审核',
+  approved: '已通过',
+  applied: '已写回',
+  rejected: '已拒绝',
+  hidden: '已隐藏',
+  failed: '失败',
+}
+
+function reviewStatusLabel(st: string): string {
+  return REVIEW_STATUS_LABELS[st] ?? st
 }
 
 function sumKinds(byKind: Record<string, number> | undefined): number {
@@ -52,28 +71,30 @@ const tiles = computed<Tile[]>(() => {
   const out: Tile[] = []
 
   for (const [space, p] of Object.entries(s.photos || {})) {
-    const sub = num(p.hashed) + ' hashed' + (p.deleted ? ' · ' + num(p.deleted) + ' deleted' : '')
-    out.push({ label: 'Photos · ' + space, value: num(p.synced), sub, to: '/pipeline' })
+    const sub =
+      num(p.hashed) + ' 张已计算哈希' + (p.deleted ? ' · ' + num(p.deleted) + ' 张已删除' : '')
+    out.push({ label: '照片 · ' + spaceLabel(space), value: num(p.synced), sub, to: '/pipeline' })
   }
 
   out.push({
-    label: 'Faces',
+    label: '人脸',
     value: num(s.faces),
-    sub: num(s.embeddings) + ' embeddings',
+    sub: num(s.embeddings) + ' 条特征向量',
     to: '/pipeline',
   })
 
   const ex = s.extract || {}
   if (!ex.models_ready) {
     out.push({
-      label: 'Photos scanned',
+      label: '已扫描照片',
       value: '—',
-      hint: { text: ' to enable face detection', linkText: 'Download models', to: '/pipeline' },
+      hint: { text: '以启用人脸检测', linkText: '下载模型', to: '/pipeline' },
     })
   } else {
-    const pct = ex.coverage != null ? Math.round(ex.coverage * 100) + '% covered' : 'no eligible photos'
+    const pct =
+      ex.coverage != null ? '已覆盖 ' + Math.round(ex.coverage * 100) + '%' : '暂无可扫描照片'
     out.push({
-      label: 'Photos scanned',
+      label: '已扫描照片',
       value: num(ex.processed) + ' / ' + num(ex.eligible),
       sub: pct,
       to: '/pipeline',
@@ -83,13 +104,13 @@ const tiles = computed<Tile[]>(() => {
   const cl = s.cluster
   if (cl) {
     out.push({
-      label: 'Face groups',
+      label: '人脸分组',
       value: num(cl.clusters),
-      sub: 'run #' + cl.run_id + ' · ' + ago(cl.created_at),
+      sub: '第 #' + cl.run_id + ' 次聚类 · ' + ago(cl.created_at),
       to: '/pipeline',
     })
   } else {
-    out.push({ label: 'Face groups', value: '—', sub: 'not grouped yet', to: '/pipeline' })
+    out.push({ label: '人脸分组', value: '—', sub: '尚未聚类分组', to: '/pipeline' })
   }
 
   return out
@@ -119,16 +140,16 @@ const stages = computed<Stage[]>(() => {
   let exNote: string
   if (!ex.models_ready) {
     exState = 'pending'
-    exNote = 'models needed'
+    exNote = '缺少模型'
   } else if (ex.eligible > 0 && ex.processed != null && ex.processed >= ex.eligible) {
     exState = 'done'
-    exNote = 'complete'
+    exNote = '已完成'
   } else if ((ex.processed ?? 0) > 0) {
     exState = 'active'
     exNote = num(ex.processed) + ' / ' + num(ex.eligible)
   } else {
     exState = 'pending'
-    exNote = 'not started'
+    exNote = '未开始'
   }
 
   const cl = s.cluster
@@ -149,49 +170,49 @@ const stages = computed<Stage[]>(() => {
   let revNote: string
   if (totalItems === 0) {
     revState = 'pending'
-    revNote = 'no items'
+    revNote = '暂无项目'
   } else if (pending > 0) {
     revState = 'active'
-    revNote = num(pending) + ' pending'
+    revNote = num(pending) + ' 项待审核'
   } else {
     revState = 'done'
-    revNote = 'all reviewed'
+    revNote = '已全部审核'
   }
 
   let apState: Stage['state']
   let apNote: string
   if (approved > 0) {
     apState = 'active'
-    apNote = num(approved) + ' approved'
+    apNote = num(approved) + ' 项已通过'
   } else if (applied > 0) {
     apState = 'done'
-    apNote = num(applied) + ' applied'
+    apNote = num(applied) + ' 项已写回'
   } else {
     apState = 'pending'
-    apNote = 'nothing to apply'
+    apNote = '暂无待写回项'
   }
 
   return [
     {
-      label: 'Sync',
+      label: '同步图库',
       to: '/pipeline',
       state: synced > 0 ? 'done' : 'pending',
-      note: synced > 0 ? num(synced) + ' synced' : 'not started',
+      note: synced > 0 ? '已同步 ' + num(synced) + ' 张' : '未开始',
     },
-    { label: 'Detect faces', to: '/pipeline', state: exState, note: exNote },
+    { label: '人脸检测与提取', to: '/pipeline', state: exState, note: exNote },
     {
-      label: 'Group faces',
+      label: '人脸聚类分组',
       to: '/pipeline',
       state: cl ? 'done' : 'pending',
-      note: cl ? num(cl.clusters) + ' groups' : 'not started',
+      note: cl ? num(cl.clusters) + ' 个分组' : '未开始',
     },
-    { label: 'Review', to: '/review', state: revState, note: revNote },
-    { label: 'Apply', to: '/apply', state: apState, note: apNote },
+    { label: '人脸审核', to: '/review', state: revState, note: revNote },
+    { label: '写回群晖', to: '/apply', state: apState, note: apNote },
   ]
 })
 
 function auditWhen(it: AuditEntry): string {
-  return it.ts ? new Date(Number(it.ts) * 1000).toLocaleString() : '—'
+  return it.ts ? new Date(Number(it.ts) * 1000).toLocaleString('zh-CN') : '—'
 }
 function auditSuccess(it: AuditEntry): 1 | 0 | -1 {
   if (it.success === 1 || it.success === true) return 1
@@ -232,19 +253,18 @@ watch(
 <template>
   <div class="page dashboard-page">
     <div v-if="empty" class="card placeholder-card">
-      <h2>No data yet</h2>
+      <h2>暂无数据</h2>
       <p class="muted">
-        Synopticon has not synced anything from your NAS. Run your first sync to pull the photo
-        library, persons and faces, then detect and group faces.
+        Synopticon 尚未从你的群晖 NAS 同步数据。请先运行首次图库同步，拉取照片、人物和人脸信息，再进行人脸检测与聚类分组。
       </p>
       <div class="cta-row">
-        <RouterLink class="btn btn-action" to="/pipeline">Run your first sync</RouterLink>
-        <RouterLink class="btn btn-ghost" to="/setup">Open the setup wizard</RouterLink>
+        <RouterLink class="btn btn-action" to="/pipeline">运行首次同步</RouterLink>
+        <RouterLink class="btn btn-ghost" to="/setup">打开初始化向导</RouterLink>
       </div>
     </div>
 
     <template v-else-if="stats">
-      <section class="stat-tiles" aria-label="Library statistics">
+      <section class="stat-tiles" aria-label="图库统计">
         <StatTile
           v-for="tile in tiles"
           :key="tile.label"
@@ -261,9 +281,9 @@ watch(
 
         <!-- Review queue tile has a breakdown row of decided-status links. -->
         <StatTile
-          label="Review queue"
+          label="审核队列"
           :value="num(reviewPending)"
-          sub="pending"
+          sub="待审核"
           :to="{ path: '/review', query: { status: 'pending' } }"
         >
           <div class="review-breakdown">
@@ -272,16 +292,16 @@ watch(
                 v-for="r in reviewBreakdown"
                 :key="r.st"
                 :to="{ path: '/review', query: { status: r.st } }"
-                >{{ r.st }} {{ num(r.n) }}</RouterLink
+                >{{ reviewStatusLabel(r.st) }} {{ num(r.n) }}</RouterLink
               >
             </template>
-            <span v-else class="muted">no decisions yet</span>
+            <span v-else class="muted">暂无审核记录</span>
           </div>
         </StatTile>
       </section>
 
-      <section class="pipeline-strip card" aria-label="Pipeline status">
-        <h3 class="sr-only">Pipeline status</h3>
+      <section class="pipeline-strip card" aria-label="处理流程状态">
+        <h3 class="sr-only">处理流程状态</h3>
         <div class="strip">
           <template v-for="(s, i) in stages" :key="s.label">
             <span v-if="i > 0" class="stage-sep" aria-hidden="true">›</span>
@@ -296,15 +316,15 @@ watch(
       </section>
 
       <section class="card audit-card">
-        <h3>Recent activity</h3>
+        <h3>近期操作记录</h3>
         <div>
-          <p v-if="!audit.length" class="muted">No writes recorded yet.</p>
+          <p v-if="!audit.length" class="muted">暂无写回记录。</p>
           <table v-else class="data">
             <thead>
               <tr>
-                <th>When</th>
-                <th>Action</th>
-                <th>Result</th>
+                <th>时间</th>
+                <th>操作</th>
+                <th>结果</th>
               </tr>
             </thead>
             <tbody>
@@ -322,7 +342,7 @@ watch(
     </template>
 
     <div v-else-if="loaded" class="card">
-      <p class="muted">Loading…</p>
+      <p class="muted">加载中…</p>
     </div>
   </div>
 </template>

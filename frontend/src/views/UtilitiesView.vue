@@ -27,7 +27,7 @@ const busyConfig = ref(false)
 const busyDatabase = ref(false)
 
 function fmtBytes(n: number | null | undefined): string {
-  if (n == null) return 'unknown size'
+  if (n == null) return '未知大小'
   const u = ['B', 'KB', 'MB', 'GB', 'TB']
   let i = 0
   let v = n
@@ -42,23 +42,23 @@ const databaseNote = () => {
   const db = backup.value?.database
   if (!db) return ''
   if (db.backend === 'postgres')
-    return 'PostgreSQL — exported table by table into a portable SQLite file.'
-  return 'SQLite — ' + fmtBytes(db.bytes) + ' on disk. The copy is compacted, so expect it smaller.'
+    return 'PostgreSQL —— 将逐表导出为可移植的 SQLite 数据库文件。'
+  return 'SQLite —— 磁盘占用 ' + fmtBytes(db.bytes) + '。导出副本会经过压缩整理，体积通常会更小。'
 }
 
 function downloadError(e: unknown): void {
   if (e instanceof ApiError && e.status === 409)
-    toast('A backup is already being prepared.', 'error')
-  else toast((e as Error).message || 'Download failed', 'error')
+    toast('已有备份正在准备中，请稍候。', 'error')
+  else toast((e as Error).message || '下载失败', 'error')
 }
 
 async function downloadSettings(): Promise<void> {
   if (includeSecrets.value) {
     const ok = await confirm({
-      title: 'Include credentials',
+      title: '包含敏感凭据',
       message:
-        'The downloaded file will contain your NAS and database passwords in plain text. Store it somewhere you would store the passwords themselves.',
-      okLabel: 'Download with credentials',
+        '下载的配置文件将以明文形式包含群晖 NAS 和数据库密码，请务必像保管密码一样妥善存放该文件。',
+      okLabel: '包含凭据并下载',
     })
     if (!ok) return
   }
@@ -68,7 +68,7 @@ async function downloadSettings(): Promise<void> {
       '/api/backup/config' + (includeSecrets.value ? '?secrets=1' : ''),
       'synopticon-config.toml',
     )
-    toast('Saved ' + name, 'ok')
+    toast('已保存 ' + name, 'ok')
   } catch (e) {
     downloadError(e)
   } finally {
@@ -78,10 +78,10 @@ async function downloadSettings(): Promise<void> {
 
 async function downloadDatabase(): Promise<void> {
   busyDatabase.value = true
-  toast('Preparing the snapshot — this can take a while on a large library.')
+  toast('正在生成数据库快照——图库较大时可能需要片刻。')
   try {
     const name = await downloadFile('/api/backup/database', 'synopticon-backup.db')
-    toast('Saved ' + name, 'ok')
+    toast('已保存 ' + name, 'ok')
   } catch (e) {
     downloadError(e)
   } finally {
@@ -103,8 +103,8 @@ function startJob(
   extra: Record<string, unknown> = {},
 ): void {
   panel.value?.start(name, params, extra).catch((e: unknown) => {
-    if (e instanceof ApiError && e.status === 428) toast('Consent required.', 'error')
-    else toast((e as Error).message || 'Failed to start job', 'error')
+    if (e instanceof ApiError && e.status === 428) toast('需要确认授权才能继续。', 'error')
+    else toast((e as Error).message || '启动任务失败', 'error')
   })
 }
 
@@ -117,7 +117,7 @@ function dedupeParams(): Record<string, unknown> {
 
 function dedupePreview(): void {
   if (!dedupe.exact && !dedupe.visual) {
-    toast('Pick exact and/or visual.', 'error')
+    toast('请至少勾选「完全一致」或「视觉相似」之一。', 'error')
     return
   }
   startJob('dedupe', dedupeParams())
@@ -125,14 +125,14 @@ function dedupePreview(): void {
 
 async function dedupeApply(): Promise<void> {
   if (!dedupe.exact && !dedupe.visual) {
-    toast('Pick exact and/or visual.', 'error')
+    toast('请至少勾选「完全一致」或「视觉相似」之一。', 'error')
     return
   }
   const ok = await confirm({
-    title: 'Delete duplicate photos',
-    message: 'This permanently deletes duplicate photos from the NAS.',
+    title: '删除重复照片',
+    message: '此操作将从群晖 NAS 永久删除重复照片，且无法撤销。',
     phrase: PHRASE_DEDUPE,
-    okLabel: 'Delete duplicates',
+    okLabel: '确认删除重复照片',
   })
   if (!ok) return
   const params = dedupeParams()
@@ -148,76 +148,73 @@ async function dedupeApply(): Promise<void> {
     <QuickMerger />
 
     <section class="card util-card">
-      <h3>Deduplicate photos</h3>
+      <h3>重复照片去重</h3>
       <p class="muted">
-        Delete duplicate photos from the NAS using stored hashes. Dry run is free; applying deletes
-        on the NAS.
+        利用已存哈希清理群晖 NAS 中的重复照片。预演不会修改任何文件；确认删除后会直接从群晖 NAS 永久删除。
       </p>
       <div class="util-opts">
         <label class="opt-check"
-          ><input type="checkbox" v-model="dedupe.exact" /> exact (sha256 identical)</label
+          ><input type="checkbox" v-model="dedupe.exact" /> 完全一致（SHA-256 字节相同）</label
         >
         <label class="opt-check"
-          ><input type="checkbox" v-model="dedupe.visual" /> visual (pHash near-duplicates)</label
+          ><input type="checkbox" v-model="dedupe.visual" /> 视觉相似（pHash 近似重复）</label
         >
         <div class="opt-row">
-          <label for="dd-threshold">Hamming threshold</label>
+          <label for="dd-threshold">汉明距离阈值</label>
           <input
             class="input input-sm"
             id="dd-threshold"
             type="number"
             min="0"
             max="64"
-            placeholder="default"
+            placeholder="默认"
             v-model="dedupe.threshold"
           />
         </div>
       </div>
       <div class="util-actions">
-        <button type="button" class="btn" @click="dedupePreview">Dry run</button>
+        <button type="button" class="btn" @click="dedupePreview">预演（不修改群晖）</button>
         <button type="button" class="btn btn-danger" @click="dedupeApply">
-          Delete duplicates…
+          删除重复照片…
         </button>
       </div>
     </section>
 
     <section class="card util-card">
-      <h3>Back up settings</h3>
+      <h3>备份系统配置</h3>
       <p class="muted">
-        Download your configuration file. Restore it by putting it back where it came from<template
+        下载当前配置文件。恢复时只需将其放回原路径<template
           v-if="backup?.config"
-        >
-          (<code>{{ backup.config.path }}</code
-          >)</template
-        >.
+        >（<code>{{ backup.config.path }}</code
+          >）</template
+        >即可。
       </p>
       <div class="util-opts">
         <label class="opt-check"
-          ><input type="checkbox" v-model="includeSecrets" /> include credentials (passwords in
-          plain text)</label
+          ><input type="checkbox" v-model="includeSecrets" /> 包含敏感凭据（明文密码）</label
         >
         <p class="muted hint">
-          Left off, these are blanked out and you re-enter them after restoring:
-          {{ backup?.config.secret_keys.join(', ') || 'every password' }}.
+          若不勾选，以下敏感字段会被清空，恢复后需重新填写：{{
+            backup?.config.secret_keys.join('、') || '所有密码项'
+          }}。
         </p>
       </div>
       <div class="util-actions">
         <button type="button" class="btn" :disabled="busyConfig" @click="downloadSettings">
-          {{ busyConfig ? 'Preparing…' : 'Download settings' }}
+          {{ busyConfig ? '正在准备…' : '下载配置文件' }}
         </button>
       </div>
     </section>
 
     <section class="card util-card">
-      <h3>Download database</h3>
+      <h3>下载数据库备份</h3>
       <p class="muted">
-        A full copy of everything Synopticon knows — photos, faces, embeddings, face groups, review
-        decisions and your account. Nothing is deleted and the NAS is untouched.
+        导出 Synopticon 本地保存的完整数据副本——包括照片索引、人脸与特征向量、人脸分组、审核记录以及你的账号信息。不会删除任何内容，也不会触碰群晖 NAS。
       </p>
       <p v-if="backup" class="muted">{{ databaseNote() }}</p>
       <div class="util-actions">
         <button type="button" class="btn" :disabled="busyDatabase" @click="downloadDatabase">
-          {{ busyDatabase ? 'Preparing…' : 'Download database' }}
+          {{ busyDatabase ? '正在准备…' : '下载数据库' }}
         </button>
       </div>
     </section>

@@ -89,18 +89,18 @@ export const SECTIONS = [
 
 /** Human labels for tabs (config sections + the pseudo Access tab). */
 export const LABELS: Record<string, string> = {
-  nas: 'NAS',
-  storage: 'Storage',
-  database: 'Database',
-  inference: 'Inference',
-  detection: 'Face detection',
-  restoration: 'Restoration',
-  clustering: 'Face grouping',
-  crossref: 'Crossref',
-  security: 'Security',
-  mcp: 'MCP',
-  models: 'Models',
-  access: 'Access',
+  nas: '群晖连接',
+  storage: '存储与缓存',
+  database: '数据库',
+  inference: '推理与加速',
+  detection: '人脸检测',
+  restoration: '画质修复',
+  clustering: '聚类分组',
+  crossref: '比对与建议',
+  security: '安全设置',
+  mcp: 'MCP 接口',
+  models: '模型管理',
+  access: '账号与权限',
 }
 
 /** Dereference a schema node (`$ref` / single-item `allOf`) against `$defs`. */

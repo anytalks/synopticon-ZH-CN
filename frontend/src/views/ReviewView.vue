@@ -37,6 +37,23 @@ import { useKeyboard } from '../composables/useKeyboard'
 const PAGE_SIZE = 100
 const KINDS = ['', 'assign', 'low_confidence', 'reassign', 'merge', 'merge_named', 'new_person']
 const STATUSES = ['pending', 'approved', 'rejected', 'hidden', 'applied', 'failed']
+const KIND_LABELS: Record<string, string> = {
+  '': '全部类型',
+  assign: '归属认领',
+  low_confidence: '低置信度复核',
+  reassign: '改判人物',
+  merge: '合并未命名分组',
+  merge_named: '合并已命名人物',
+  new_person: '发现新人物',
+}
+const STATUS_LABELS: Record<string, string> = {
+  pending: '待审核',
+  approved: '已通过',
+  rejected: '已拒绝',
+  hidden: '已隐藏',
+  applied: '已写回',
+  failed: '写回失败',
+}
 const PREFETCH_MARGIN = 20 // focus: prefetch when within N of the loaded tail
 
 const route = useRoute()
@@ -212,9 +229,9 @@ function maybePrefetch(): void {
 
 // -- decisions --------------------------------------------------------------- #
 const DECISION_VERB: Record<ReviewDecision, string> = {
-  approve: 'approve',
-  reject: 'reject',
-  hide: 'hide',
+  approve: '通过',
+  reject: '拒绝',
+  hide: '隐藏',
 }
 
 async function decide(
@@ -239,14 +256,15 @@ async function decide(
 async function undo(): Promise<void> {
   const last = undoStack.value.pop()
   if (!last) {
-    toast('Nothing to undo')
+    toast('没有可撤销的操作')
     return
   }
   try {
     await postJSON(`/api/review/${last.id}/decide`, { decision: 'undo' })
     const item = items.value.find((it) => it.item_id === last.id)
     if (item) item.decision = null
-    toast(`Undid ${DECISION_VERB[last.decision]} of ${last.kind} #${last.id}`)
+    const kindLabel = KIND_LABELS[last.kind] ?? last.kind
+    toast(`已撤销对「${kindLabel}」#${last.id} 的${DECISION_VERB[last.decision]}操作`)
     if (item) select(navIndexOf(item.item_id))
   } catch (e) {
     toast(errMsg(e), 'error')
@@ -277,9 +295,9 @@ const pickerLabel = computed(() => {
   if (!open) return ''
   if (open.mode === 'merge') {
     const n = Number(open.item.payload.size ?? open.item.new_person_crops.length) || 0
-    return `${n} face${n === 1 ? '' : 's'}`
+    return `${n} 张人脸`
   }
-  return String(open.item.payload.person_name || open.item.payload.person_id || 'unnamed')
+  return String(open.item.payload.person_name || open.item.payload.person_id || '未命名人物')
 })
 const pickerCrops = computed(() => {
   const open = picker.value
@@ -316,12 +334,12 @@ async function onPickerConfirm(target: ReviewPersonSuggestion): Promise<void> {
     picker.value = null
     if (mode === 'merge') {
       toast(
-        `Queued ${res.created} face${res.created === 1 ? '' : 's'} as ${target.name}` +
-          (res.skipped ? ` · ${res.skipped} skipped` : ''),
+        `已加入待写回队列：${res.created} 张人脸将标记为 ${target.name}` +
+          (res.skipped ? ` · 跳过 ${res.skipped} 张` : ''),
         'ok',
       )
     } else {
-      toast(`Reassigned to ${target.name}`, 'ok')
+      toast(`已改判为 ${target.name}`, 'ok')
     }
     if (idx >= 0) select(idx)
     void refreshCounts()
@@ -351,7 +369,20 @@ async function onBulkApprove(payload: {
       kind: payload.kind,
       min_confidence: payload.minConfidence,
     })
-    toast(`Approved ${res.approved}`)
+    toast(`已批量通过 ${res.approved} 条建议`)
+    await reload()
+    void refreshCounts()
+  } catch (e) {
+    toast(errMsg(e), 'error')
+  }
+}
+
+async function onBulkApproveAll(payload: { kind: string }): Promise<void> {
+  try {
+    const res = await postJSON<{ approved: number }>('/api/review/bulk-all', {
+      kind: payload.kind,
+    })
+    toast(`已一键通过 ${res.approved} 条待审核建议`, 'ok')
     await reload()
     void refreshCounts()
   } catch (e) {
@@ -363,19 +394,19 @@ const canUndo = computed(() => undoStack.value.length > 0)
 const undoTitle = computed(() => {
   const last = undoStack.value[undoStack.value.length - 1]
   return last
-    ? `Undo ${DECISION_VERB[last.decision]} of ${last.kind} #${last.id}`
-    : 'Nothing to undo'
+    ? `撤销对「${KIND_LABELS[last.kind] ?? last.kind}」#${last.id} 的${DECISION_VERB[last.decision]}操作`
+    : '没有可撤销的操作'
 })
 
 // Focus empty-state message (review.js emptyMessage): considers every loaded
 // item so it can distinguish "all filtered out" from "all decided".
 const emptyMessage = computed(() => {
-  if (!exhausted.value) return 'Loading…'
+  if (!exhausted.value) return '加载中…'
   const all = items.value
-  if (!all.length) return 'Nothing to review.'
+  if (!all.length) return '暂无待审核内容。'
   if (all.some((it) => !it.decision))
-    return 'All remaining items are hidden by the current filters.'
-  return 'End of queue — every loaded item is decided.'
+    return '其余条目已被当前筛选条件隐藏。'
+  return '已到达队列末尾，所有已加载条目均已处理完毕。'
 })
 
 // -- view / filter wiring ---------------------------------------------------- #
@@ -463,11 +494,11 @@ onMounted(async () => {
 
 <template>
   <div class="page review-page" id="review-page">
-    <div class="toolbar" role="region" aria-label="Review controls">
+    <div class="toolbar" role="region" aria-label="审核控制栏">
       <div class="toolbar-row">
         <div class="filters">
           <label for="f-kind">
-            <span class="muted">Kind</span>
+            <span class="muted">建议类型</span>
             <select
               name="kind"
               id="f-kind"
@@ -475,11 +506,11 @@ onMounted(async () => {
               v-model="kind"
               @change="applyFilters"
             >
-              <option v-for="k in KINDS" :key="k" :value="k">{{ k || 'all kinds' }}</option>
+              <option v-for="k in KINDS" :key="k" :value="k">{{ KIND_LABELS[k] ?? k }}</option>
             </select>
           </label>
           <label for="f-status">
-            <span class="muted">Status</span>
+            <span class="muted">状态</span>
             <select
               name="status"
               id="f-status"
@@ -487,15 +518,15 @@ onMounted(async () => {
               v-model="status"
               @change="applyFilters"
             >
-              <option v-for="s in STATUSES" :key="s" :value="s">{{ s }}</option>
+              <option v-for="s in STATUSES" :key="s" :value="s">{{ STATUS_LABELS[s] ?? s }}</option>
             </select>
           </label>
-          <button type="button" class="btn btn-action btn-filter" @click="applyFilters">Filter</button>
+          <button type="button" class="btn btn-action btn-filter" @click="applyFilters">筛选</button>
         </div>
         <div class="toolbar-sep"></div>
         <label for="f-view">
-          <span class="muted">View</span>
-          <div class="seg" role="group" aria-label="Review layout">
+          <span class="muted">视图</span>
+          <div class="seg" role="group" aria-label="审核布局">
             <button
               type="button"
               class="seg-btn"
@@ -503,7 +534,7 @@ onMounted(async () => {
               :aria-pressed="view !== 'focus'"
               @click="setView('grid')"
             >
-              Grid
+              网格
             </button>
             <button
               type="button"
@@ -512,18 +543,23 @@ onMounted(async () => {
               :aria-pressed="view === 'focus'"
               @click="setView('focus')"
             >
-              Focus
+              专注
             </button>
           </div>
         </label>
         <div class="toolbar-sep"></div>
         <div class="toolbar-spacer"></div>
         <span class="loaded-count" id="loaded-count" aria-live="polite">
-          {{ loaded }} of {{ total }} loaded<template v-if="pendingCount">
-            · {{ pendingCount }} pending</template
+          已加载 {{ loaded }} / {{ total }} 条<template v-if="pendingCount">
+            · {{ pendingCount }} 条待审核</template
           >
         </span>
-        <BulkApproveBar :kind="kind" @approve="onBulkApprove" />
+        <BulkApproveBar
+          :kind="kind"
+          :pending-by-kind="counts.pending ?? {}"
+          @approve="onBulkApprove"
+          @approve-all="onBulkApproveAll"
+        />
         <button
           class="btn btn-sm btn-ghost"
           type="button"
@@ -532,7 +568,7 @@ onMounted(async () => {
           :title="undoTitle"
           @click="undo"
         >
-          Undo <kbd>u</kbd>
+          撤销 <kbd>u</kbd>
         </button>
         <button
           class="btn btn-sm btn-ghost"
@@ -540,20 +576,20 @@ onMounted(async () => {
           aria-haspopup="dialog"
           @click="legendOpen = !legendOpen"
         >
-          Shortcuts
+          快捷键
         </button>
       </div>
 
       <div class="toolbar-row">
         <label
           class="check muted"
-          title="Hide assigns, low-confidence assigns and reassigns whose target person has no name"
+          title="隐藏目标人物尚未命名的归属认领、低置信度复核和改判人物建议"
         >
-          Hide unnamed targets
+          隐藏未命名目标
           <input type="checkbox" v-model="hideUnnamed" /> 
         </label>
         <label class="check muted">
-          Hide merges between unnamed
+          隐藏未命名分组间合并
           <input type="checkbox" v-model="hideUnnamedMerges" /> 
         </label>
       </div>
@@ -600,23 +636,22 @@ onMounted(async () => {
     v-if="legendOpen"
     class="popover"
     role="dialog"
-    aria-label="Keyboard shortcuts"
+    aria-label="键盘快捷键"
   >
-    <h3>Keyboard shortcuts</h3>
+    <h3>键盘快捷键</h3>
     <ul>
-      <li><kbd>y</kbd> approve · <kbd>n</kbd> reject · <kbd>s</kbd> skip</li>
-      <li><kbd>j</kbd> next card · <kbd>k</kbd> previous card</li>
-      <li><kbd>&larr;</kbd> previous · <kbd>&rarr;</kbd> next (focus view)</li>
-      <li><kbd>u</kbd> undo last decision (this session)</li>
+      <li><kbd>y</kbd> 通过 · <kbd>n</kbd> 拒绝 · <kbd>s</kbd> 跳过</li>
+      <li><kbd>j</kbd> 下一张 · <kbd>k</kbd> 上一张</li>
+      <li><kbd>&larr;</kbd> 上一张 · <kbd>&rarr;</kbd> 下一张（专注视图）</li>
+      <li><kbd>u</kbd> 撤销上次操作（仅限本次会话）</li>
       <li>
-        New people: <kbd>h</kbd> hide for good · <kbd>m</kbd> merge into an
-        existing person
+        发现新人物：<kbd>h</kbd> 永久隐藏 · <kbd>m</kbd> 并入已有的人物
       </li>
       <li>
-        Suggested tags: <kbd>r</kbd> reassign to a different person (not undoable)
+        归属建议：<kbd>r</kbd> 改判给其他人物（不可撤销）
       </li>
     </ul>
-    <button class="btn btn-sm" type="button" @click="legendOpen = false">Close</button>
+    <button class="btn btn-sm" type="button" @click="legendOpen = false">关闭</button>
   </div>
 </template>
 

@@ -35,12 +35,32 @@ const STATUS_BY_DECISION: Record<ReviewDecision, string> = {
   hide: 'hidden',
 }
 
+const KIND_LABELS: Record<string, string> = {
+  assign: '归属认领',
+  low_confidence: '低置信度复核',
+  reassign: '改判人物',
+  merge: '合并未命名分组',
+  merge_named: '合并已命名人物',
+  new_person: '发现新人物',
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: '待审核',
+  approved: '已通过',
+  rejected: '已拒绝',
+  hidden: '已隐藏',
+  applied: '已写回',
+  failed: '写回失败',
+}
+
 const decided = computed(() => props.decision != null)
+const displayKind = computed(() => KIND_LABELS[props.item.kind] ?? props.item.kind)
 // The footer's status half is the client-side status display, matching
 // review.js setCardStatus(): the decision wins over the server-loaded status.
-const displayStatus = computed(() =>
-  props.decision ? STATUS_BY_DECISION[props.decision] : props.item.status,
-)
+const displayStatus = computed(() => {
+  const raw = props.decision ? STATUS_BY_DECISION[props.decision] : props.item.status
+  return STATUS_LABELS[raw] ?? raw
+})
 
 const p = computed(() => props.item.payload)
 
@@ -83,10 +103,10 @@ function onActivate(e: Event): void {
         v-if="item.inspect_url"
         :to="item.inspect_url"
         target="_blank"
-        title="inspect this photo"
-        ><img :src="item.crop" alt="face crop" loading="lazy" decoding="async"
+        title="检视这张照片"
+        ><img :src="item.crop" alt="人脸头像" loading="lazy" decoding="async"
       /></RouterLink>
-      <img v-else :src="item.crop" alt="face crop" loading="lazy" decoding="async" />
+      <img v-else :src="item.crop" alt="人脸头像" loading="lazy" decoding="async" />
     </template>
 
     <!-- new_person: exemplar thumbs + editable suggested name. -->
@@ -98,7 +118,7 @@ function onActivate(e: Event): void {
               v-if="item.new_person_inspect_urls[i]"
               :to="item.new_person_inspect_urls[i]!"
               target="_blank"
-              title="inspect this photo"
+              title="检视这张照片"
               ><img :src="c" alt="" loading="lazy" decoding="async"
             /></RouterLink>
             <img v-else :src="c" alt="" loading="lazy" decoding="async" />
@@ -107,10 +127,10 @@ function onActivate(e: Event): void {
       </div>
       <input
         class="name-input"
-        placeholder="suggested name"
+        placeholder="建议名称"
         :value="p.suggested_name || ''"
         @change="onName"
-        aria-label="Suggested name"
+        aria-label="建议名称"
       />
     </template>
 
@@ -119,9 +139,9 @@ function onActivate(e: Event): void {
       <div
         v-if="item.named_merge"
         class="danger-banner"
-        title="Both people are already named — merging is irreversible and destroys a human label"
+        title="双方均为已命名人物 — 合并不可撤销，且会移除其中一个已有人物名称"
       >
-        &#9888; named &harr; named — irreversible, destroys a human label
+        &#9888; 已命名 &harr; 已命名 — 不可撤销，将移除其中一个名称
       </div>
       <div class="merge">
         <div class="merge-side">
@@ -193,13 +213,13 @@ function onActivate(e: Event): void {
               v-if="item.inspect_url"
               :to="item.inspect_url"
               target="_blank"
-              title="inspect this photo"
-              ><img :src="item.crop" alt="face crop" loading="lazy" decoding="async"
+              title="检视这张照片"
+              ><img :src="item.crop" alt="人脸头像" loading="lazy" decoding="async"
             /></RouterLink>
             <img
               v-else
               :src="item.crop"
-              alt="face crop"
+              alt="人脸头像"
               loading="lazy"
               decoding="async"
             />
@@ -235,10 +255,10 @@ function onActivate(e: Event): void {
         </div>
       </div>
       <div class="muted">
-        to-sim {{ fmt(item.confidence) }}<template
+        目标相似度 {{ fmt(item.confidence) }}<template
           v-if="p.from_similarity != null"
         >
-          · from-sim {{ fmt(p.from_similarity) }}</template
+          · 原人物相似度 {{ fmt(p.from_similarity) }}</template
         >
       </div>
     </template>
@@ -270,16 +290,17 @@ function onActivate(e: Event): void {
       <!-- A retargeted item's stored confidence was a similarity to the person
            the human overruled, so there is no score left to show. -->
       <div class="muted">
-        <template v-if="p.manual_target">you picked this person</template>
-        <template v-else>conf {{ fmt(item.confidence) }}</template>
+        <template v-if="p.manual_target">已手动指定该人物</template>
+        <template v-else>置信度 {{ fmt(item.confidence) }}</template>
       </div>
     </template>
 
-    <div class="muted card-kind">{{ item.kind }} · {{ displayStatus }}</div>
+    <div class="muted card-kind">{{ displayKind }} · {{ displayStatus }}</div>
     <div class="card-actions">
       <button
         class="btn btn-sm btn-primary"
         type="button"
+        title="通过"
         @click="emit('decide', 'approve')"
       >
         &check; <kbd>y</kbd>
@@ -287,6 +308,7 @@ function onActivate(e: Event): void {
       <button
         class="btn btn-sm btn-ghost"
         type="button"
+        title="拒绝"
         @click="emit('decide', 'reject')"
       >
         &cross; <kbd>n</kbd>
@@ -295,28 +317,28 @@ function onActivate(e: Event): void {
         <button
           class="btn btn-sm btn-ghost"
           type="button"
-          title="Never suggest this group again"
+          title="以后不再建议该分组"
           @click="emit('decide', 'hide')"
         >
-          Hide <kbd>h</kbd>
+          隐藏 <kbd>h</kbd>
         </button>
         <button
           class="btn btn-sm btn-ghost"
           type="button"
-          title="These faces belong to a person who already exists"
+          title="这些人脸属于已有的人物"
           @click="emit('retarget', 'merge')"
         >
-          Merge into&hellip; <kbd>m</kbd>
+          并入&hellip; <kbd>m</kbd>
         </button>
       </template>
       <button
         v-else-if="item.kind === 'assign' || item.kind === 'low_confidence'"
         class="btn btn-sm btn-ghost"
         type="button"
-        title="Pick a different person for this face"
+        title="为此人脸选择其他人物"
         @click="emit('retarget', 'reassign')"
       >
-        Reassign&hellip; <kbd>r</kbd>
+        改判&hellip; <kbd>r</kbd>
       </button>
     </div>
   </div>

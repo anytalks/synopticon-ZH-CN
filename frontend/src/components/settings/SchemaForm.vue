@@ -54,7 +54,7 @@ const flatFields = computed<FieldDescriptor[]>(() => sections.value.flatMap((s) 
 
 // The status line: an explicit save outcome wins; otherwise a live dirty hint.
 const statusText = computed(() =>
-  saveStatus.text ? saveStatus.text : dirty.value ? 'Unsaved changes' : '',
+  saveStatus.text ? saveStatus.text : dirty.value ? '有未保存的更改' : '',
 )
 const statusClass = computed(() =>
   saveStatus.text ? saveStatus.cls : dirty.value ? 'dirty' : '',
@@ -91,7 +91,7 @@ async function load(): Promise<void> {
     cfg = await getJSON<ConfigDoc>('/api/config')
   } catch (e) {
     loadError.value =
-      'Could not load configuration: ' + ((e as Error).message || 'error')
+      '无法加载配置：' + ((e as Error).message || '发生错误')
     loading.value = false
     return
   }
@@ -137,13 +137,13 @@ function showErrors(errs: ConfigError[]): void {
       toast(`${err.loc}: ${err.msg}`, 'error')
     }
   }
-  saveStatus.text = 'Please fix the highlighted fields'
+  saveStatus.text = '请修正高亮显示的字段'
   saveStatus.cls = 'err'
   if (bad.length) emit('activate', bad[0])
 }
 
 function clientIpSuffix(body: ApiErrorBody): string {
-  return typeof body.client_ip === 'string' ? ` Your address: ${body.client_ip}.` : ''
+  return typeof body.client_ip === 'string' ? ` 当前浏览器地址：${body.client_ip}。` : ''
 }
 
 // PUT /api/config's 409 is one of four shapes (guarded_write, §5.3): three
@@ -160,28 +160,28 @@ function handleSaveError(err: unknown, partial: Record<string, Record<string, un
   }
   if (err instanceof ApiError && err.status === 409 && body) {
     if (body.shadowed) {
-      saveStatus.text = String(body.error || 'That setting is set by an environment variable and cannot be saved here.')
+      saveStatus.text = String(body.error || '该配置项已被环境变量覆盖，无法在此保存。')
       saveStatus.cls = 'err'
       return
     }
     if (body.unenforceable) {
       saveStatus.text =
-        String(body.error || 'That allowlist cannot be enforced from here.') + clientIpSuffix(body)
+        String(body.error || '当前连接方式下无法强制执行该允许列表。') + clientIpSuffix(body)
       saveStatus.cls = 'err'
       return
     }
     if (body.lockout) {
       saveStatus.text =
-        String(body.error || 'That allowlist would lock this browser out.') + clientIpSuffix(body)
+        String(body.error || '该允许列表会将当前浏览器拒之门外。') + clientIpSuffix(body)
       saveStatus.cls = 'err'
       lockoutRetry.value = partial
       return
     }
-    saveStatus.text = 'A job is running — try again once it finishes'
+    saveStatus.text = '有任务正在运行——请等待任务完成后再试'
     saveStatus.cls = 'err'
     return
   }
-  saveStatus.text = (err as Error).message || 'Save failed'
+  saveStatus.text = (err as Error).message || '保存失败'
   saveStatus.cls = 'err'
 }
 
@@ -191,12 +191,12 @@ async function save(): Promise<void> {
   try {
     partial = buildPartial()
   } catch {
-    saveStatus.text = 'Invalid JSON in one of the fields'
+    saveStatus.text = '某个字段中的 JSON 格式无效'
     saveStatus.cls = 'err'
     return
   }
   if (Object.keys(partial).length === 0) {
-    saveStatus.text = 'Nothing to save'
+    saveStatus.text = '没有需要保存的更改'
     saveStatus.cls = ''
     return
   }
@@ -204,9 +204,9 @@ async function save(): Promise<void> {
   try {
     await putJSON('/api/config', partial)
     lockoutRetry.value = null
-    saveStatus.text = 'Saved. Some changes take effect on restart.'
+    saveStatus.text = '已保存。部分配置需重启服务后生效。'
     saveStatus.cls = 'ok'
-    toast('Configuration saved', 'ok')
+    toast('配置已保存', 'ok')
     await load()
   } catch (err) {
     handleSaveError(err, partial)
@@ -226,9 +226,9 @@ async function saveAnyway(): Promise<void> {
   try {
     await putJSON('/api/config?allow_lockout=1', partial)
     lockoutRetry.value = null
-    saveStatus.text = 'Saved. Some changes take effect on restart.'
+    saveStatus.text = '已保存。部分配置需重启服务后生效。'
     saveStatus.cls = 'ok'
-    toast('Configuration saved', 'ok')
+    toast('配置已保存', 'ok')
     await load()
   } catch (err) {
     handleSaveError(err, partial)
@@ -258,15 +258,15 @@ onUnmounted(() => window.removeEventListener('beforeunload', onBeforeUnload))
 onBeforeRouteLeave(async () => {
   if (!dirty.value) return true
   return confirm({
-    title: 'Discard changes?',
-    message: 'You have unsaved configuration changes. Leave without saving?',
-    okLabel: 'Discard',
+    title: '放弃未保存的更改？',
+    message: '你有尚未保存的配置更改，确定不保存就离开吗？',
+    okLabel: '放弃更改',
   })
 })
 </script>
 
 <template>
-  <p v-if="loading" class="settings-loading">Loading configuration…</p>
+  <p v-if="loading" class="settings-loading">正在加载配置…</p>
   <p v-else-if="loadError" class="settings-loading">{{ loadError }}</p>
 
   <template v-else>
@@ -291,9 +291,9 @@ onBeforeRouteLeave(async () => {
 
     <div class="save-bar">
       <button class="btn btn-primary" type="button" :disabled="!dirty || saving" @click="save">
-        Save changes
+        保存更改
       </button>
-      <button class="btn btn-ghost" type="button" @click="discard">Discard</button>
+      <button class="btn btn-ghost" type="button" @click="discard">放弃更改</button>
       <button
         v-if="lockoutRetry"
         class="btn btn-danger"
@@ -301,7 +301,7 @@ onBeforeRouteLeave(async () => {
         :disabled="saving"
         @click="saveAnyway"
       >
-        Save anyway
+        仍然保存
       </button>
       <span class="save-status" :class="statusClass" aria-live="polite">{{ statusText }}</span>
     </div>

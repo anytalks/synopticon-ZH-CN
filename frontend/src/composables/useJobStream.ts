@@ -84,18 +84,73 @@ export interface JobStream {
   stop: () => void
 }
 
-/** Compact duration for the UI: `42s`, `4m 12s`, `1h 07m`. */
-export function formatDuration(seconds: number): string {
-  const s = Math.max(0, Math.round(seconds))
-  if (s < 60) return `${s}s`
-  if (s < 3600) return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`
-  return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}m`
+const PHASE_LABELS: Record<string, string> = {
+  'sync.items': '同步照片目录',
+  'sync.persons': '同步人物列表',
+  'sync.similar': '同步相似项',
+  'sync.faces': '同步人脸数据',
+  'sync.hashes': '计算内容哈希',
+  extract: '人脸检测与提取',
+  benchmark: '性能基准测试',
+  warmup: '预热',
+  measure: '测速',
+  reset: '重置数据',
+  'crops.regen': '重新生成人脸头像',
+  'crops.delete': '删除人脸头像',
+  report: '生成审核报告',
+  'db.copy': '复制数据库',
+  apply: '写回群晖',
+  'dedupe.scan': '扫描重复照片',
+  'dedupe.delete': '删除重复照片',
+  'cluster.load': '加载人脸特征',
+  'cluster.graph': '构建相似度图',
+  'cluster.labels': '聚类分组',
+  'cluster.crossref': '比对群晖人物',
+  'cluster.nearest': '检索相近人脸',
+  'cluster.persist': '保存分组结果',
 }
 
-/** Rate with a unit that stays readable for slow work: `41.2/s`, `2.4/min`. */
+const SPACE_LABELS: Record<string, string> = {
+  personal: '个人空间',
+  shared: '共享空间',
+}
+
+const STATE_LABELS: Record<string, string> = {
+  queued: '排队中',
+  running: '运行中',
+  succeeded: '已完成',
+  failed: '失败',
+  cancelled: '已取消',
+  interrupted: '已中断',
+}
+
+export function phaseLabel(phase: string | null | undefined): string {
+  if (!phase) return ''
+  return PHASE_LABELS[phase] ?? phase
+}
+
+export function spaceLabel(space: string | null | undefined): string {
+  if (!space) return ''
+  return SPACE_LABELS[space] ?? space
+}
+
+export function jobStateLabel(state: string | null | undefined): string {
+  if (!state) return ''
+  return STATE_LABELS[state] ?? state
+}
+
+/** Compact duration for the UI: `42秒`, `4分 12秒`, `1小时 07分`. */
+export function formatDuration(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds))
+  if (s < 60) return `${s}秒`
+  if (s < 3600) return `${Math.floor(s / 60)}分 ${String(s % 60).padStart(2, '0')}秒`
+  return `${Math.floor(s / 3600)}小时 ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}分`
+}
+
+/** Rate with a unit that stays readable for slow work: `41.2/秒`, `2.4/分`. */
 export function formatRate(perSecond: number): string {
-  if (perSecond >= 1) return `${perSecond.toFixed(1)}/s`
-  return `${(perSecond * 60).toFixed(1)}/min`
+  if (perSecond >= 1) return `${perSecond.toFixed(1)}/秒`
+  return `${(perSecond * 60).toFixed(1)}/分`
 }
 
 export function useJobStream(options: UseJobStreamOptions = {}): JobStream {
@@ -170,7 +225,9 @@ export function useJobStream(options: UseJobStreamOptions = {}): JobStream {
     if (key !== activePhaseKey) {
       // Narrate the transition into the log too: the chips only show *that* a
       // phase ran, while the log is what a user scrolls back through afterwards.
-      appendLog('phase', `▶ ${key}`)
+      const displayPhase = phaseLabel(phase)
+      const displayKey = space ? `${displayPhase}（${spaceLabel(space)}）` : displayPhase
+      appendLog('phase', `▶ ${displayKey}`)
       activePhaseKey = key
       rateSamples = []
     }
@@ -179,7 +236,8 @@ export function useJobStream(options: UseJobStreamOptions = {}): JobStream {
   function setProgress(evt: JobEvent): void {
     const done = evt.done
     const total = evt.total
-    const label = evt.space ? `${evt.phase} (${evt.space})` : evt.phase || ''
+    const pLabel = evt.phase ? phaseLabel(evt.phase) : ''
+    const label = evt.space ? `${pLabel}（${spaceLabel(evt.space)}）` : pLabel
 
     // Sample throughput, keeping only the trailing window.
     const now = typeof evt.ts === 'number' ? evt.ts : Date.now() / 1000
@@ -234,13 +292,13 @@ export function useJobStream(options: UseJobStreamOptions = {}): JobStream {
         break
       case 'result': {
         const stats = (evt.stats as Record<string, unknown>) || {}
-        appendLog('info', 'result: ' + JSON.stringify(stats))
+        appendLog('info', '结果：' + JSON.stringify(stats))
         result.value = stats
         options.onDone?.(evt)
         break
       }
       case 'error': {
-        const msg = evt.message || 'error'
+        const msg = evt.message || '发生错误'
         // A failure with no structured `error` event gets one synthesized from
         // the tail of stderr — which the console mirror has usually already
         // shown. Keep the event (it is what `error` binds to) but don't print
@@ -263,12 +321,15 @@ export function useJobStream(options: UseJobStreamOptions = {}): JobStream {
     tickClock() // snap elapsed to the end before the interval is gone
     // A terminal line the user can see, so the log always ends by saying how the
     // run ended rather than just trailing off.
-    const took = elapsed.value !== null ? ` after ${formatDuration(elapsed.value)}` : ''
+    const took = elapsed.value !== null ? `，耗时 ${formatDuration(elapsed.value)}` : ''
     if (state === 'succeeded') {
-      appendLog('info', `✓ completed${took}`)
+      appendLog('info', `✓ 已完成${took}`)
     } else {
-      const code = typeof exitCode === 'number' ? ` (exit code ${exitCode})` : ''
-      appendLog(state === 'cancelled' ? 'warning' : 'error', `${state}${code}${took}`)
+      const code = typeof exitCode === 'number' ? `（退出码 ${exitCode}）` : ''
+      appendLog(
+        state === 'cancelled' ? 'warning' : 'error',
+        `${jobStateLabel(state) || '已结束'}${code}${took}`,
+      )
     }
     if (progress.value) progress.value = { ...progress.value, indeterminate: false }
     // Match job-panel.js: clear `active` from every phase; on success mark them

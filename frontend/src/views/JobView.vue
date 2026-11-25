@@ -15,7 +15,7 @@ const label = computed(() => (/^\d+$/.test(id) ? '#' + id : id))
 <template>
   <div class="page">
     <div class="card">
-      <h2>Job <span class="mono">{{ label }}</span></h2>
+      <h2>任务 <span class="mono">{{ label }}</span></h2>
     </div>
     <JobPanel :job-id="id" />
   </div>

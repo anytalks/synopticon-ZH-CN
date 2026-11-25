@@ -83,14 +83,36 @@ class ScrfdDetector:
         session=None,
     ):
         self.detection = detection
+        inference = inference or InferenceConfig()
         if session is None:
-            inference = inference or InferenceConfig()
+            # SCRFD exports static output shape metadata (640x640 -> [12800, 1])
+            # while running on dynamic HxW inputs; CoreML rejects any non-640x640
+            # input with "Invalid shape for output feature '_448'", so keep it on
+            # CPU/CUDA (allow_coreml=False).
             session = create_session(
-                model_path, inference.device, inference.intra_op_threads, inference.device_id
+                model_path,
+                inference.device,
+                inference.intra_op_threads,
+                inference.device_id,
+                allow_coreml=False,
             )
         self.session = session
         self.input_name = session.get_inputs()[0].name
         self._center_cache: dict[tuple[int, int, int], np.ndarray] = {}
+        self._forward_count = 0
+        self._seen_shapes: set[tuple[int, int]] = set()
+        self._shrink_run_options = None
+        try:
+            if "CUDAExecutionProvider" in session.get_providers():
+                import onnxruntime as ort
+
+                ro = ort.RunOptions()
+                ro.add_run_config_entry(
+                    "memory.enable_memory_arena_shrinkage", f"gpu:{inference.device_id}"
+                )
+                self._shrink_run_options = ro
+        except Exception:  # noqa: BLE001 - mock sessions in tests lack get_providers
+            pass
 
     @classmethod
     def from_manifest(
@@ -120,7 +142,18 @@ class ScrfdDetector:
         blob = cv2.dnn.blobFromImage(
             padded, 1.0 / 128.0, (input_w, input_h), (127.5, 127.5, 127.5), swapRB=True
         )
-        outputs = self.session.run(None, {self.input_name: blob})
+        run_opts = None
+        if self._shrink_run_options is not None:
+            self._forward_count += 1
+            shape_key = (input_h, input_w)
+            is_new_shape = shape_key not in self._seen_shapes
+            if is_new_shape:
+                if len(self._seen_shapes) >= 64:
+                    self._seen_shapes.clear()
+                self._seen_shapes.add(shape_key)
+            if is_new_shape or (self._forward_count % 10 == 0):
+                run_opts = self._shrink_run_options
+        outputs = self.session.run(None, {self.input_name: blob}, run_options=run_opts)
         if len(outputs) != _FMC * 3:
             raise RuntimeError(
                 f"SCRFD model produced {len(outputs)} outputs, expected {_FMC * 3} "

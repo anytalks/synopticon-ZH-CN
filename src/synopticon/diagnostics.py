@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 from synopticon.config import Settings
-from synopticon.pipeline.onnx_session import physical_cores
+from synopticon.pipeline.onnx_session import default_intra_op_threads, physical_cores
 
 Section = tuple[str, list[tuple[str, str]]]
 
@@ -192,6 +192,7 @@ def _onnx_section(settings: Settings) -> Section:
     rows: list[tuple[str, str]] = []
     gpus = _nvidia_gpus()
     cuda = False
+    coreml = False
     ort_ok = False
     try:
         import onnxruntime as ort
@@ -199,6 +200,7 @@ def _onnx_section(settings: Settings) -> Section:
         ort_ok = True
         providers = ort.get_available_providers()
         cuda = "CUDAExecutionProvider" in providers
+        coreml = "CoreMLExecutionProvider" in providers
         rows.append(("onnxruntime", ort.__version__))
         rows.append(("Execution providers", ", ".join(providers)))
     except Exception as exc:  # noqa: BLE001 - diagnostics must not crash
@@ -208,6 +210,8 @@ def _onnx_section(settings: Settings) -> Section:
         gpu_status = "unknown — onnxruntime failed to import (see the row above)"
     elif cuda:
         gpu_status = "available (CUDA)"
+    elif coreml:
+        gpu_status = "available (CoreML MLProgram — YOLOv8-face + 3 embedders; SCRFD on CPU)"
     elif gpus:
         # The single most common surprise: healthy GPU, but the CPU-only wheel.
         gpu_status = ("not available — GPU detected but CPU-only onnxruntime is installed; "
@@ -220,7 +224,13 @@ def _onnx_section(settings: Settings) -> Section:
     inf = settings.inference
     rows.append(("Configured device", inf.device))
     rows.append(("device_id", str(inf.device_id)))
-    rows.append(("intra_op_threads", str(inf.intra_op_threads) if inf.intra_op_threads else f"{physical_cores()} (physical cores)"))
+    default_threads = default_intra_op_threads()
+    default_label = (
+        f"{default_threads} (Apple Silicon performance cores)"
+        if default_threads != physical_cores()
+        else f"{default_threads} (physical cores)"
+    )
+    rows.append(("intra_op_threads", str(inf.intra_op_threads) if inf.intra_op_threads else default_label))
     rows.append(("batch_size", str(inf.batch_size)))
     thread_env = [f"{k}={os.environ[k]}" for k in
                   ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS") if k in os.environ]

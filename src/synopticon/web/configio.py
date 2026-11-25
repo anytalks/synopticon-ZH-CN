@@ -30,8 +30,15 @@ from typing import Any
 
 from pydantic import BaseModel, SecretStr, ValidationError
 
-from ..config import Settings, _config_file
+from ..config import Settings, _config_file, load_settings
 from . import clientip
+
+
+def _refresh_settings_in_place(settings: Settings) -> None:
+    """Reload config.toml + env vars into the live ``settings`` instance."""
+    fresh = load_settings()
+    for field_name in type(settings).model_fields:
+        setattr(settings, field_name, getattr(fresh, field_name))
 
 #: Sentinel a client sends for a secret field it does not want to change.
 _UNCHANGED = "__unchanged__"
@@ -398,6 +405,7 @@ def guarded_write(
 
     if allow_lockout:
         _atomic_write(doc, target, tomlkit)
+        _refresh_settings_in_place(settings)
         return None, None
 
     trusted = clientip.parse_networks(sec.trusted_proxies)
@@ -460,6 +468,7 @@ def guarded_write(
         }
 
     _atomic_write(doc, target, tomlkit)
+    _refresh_settings_in_place(settings)
     return None, None
 
 
@@ -514,6 +523,7 @@ def register_config_routes(app, settings: Settings, conn, job_manager) -> None:
     # -- config ------------------------------------------------------------- #
     @app.get("/api/config")
     def api_get_config():
+        _refresh_settings_in_place(settings)
         return read_config(settings)
 
     @app.put("/api/config")

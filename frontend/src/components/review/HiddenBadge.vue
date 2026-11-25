@@ -9,8 +9,8 @@ defineProps<{ cls?: string }>()
   <span
     class="hidden-badge"
     :class="cls"
-    title="Hidden on Synology Photos"
-    aria-label="Person hidden on Synology Photos"
+    title="在群晖照片中已隐藏"
+    aria-label="该人物在群晖照片中已隐藏"
   >
     <svg
       viewBox="0 0 24 24"

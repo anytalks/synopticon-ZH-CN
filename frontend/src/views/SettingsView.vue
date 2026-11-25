@@ -13,6 +13,20 @@ import ModelsTab from '../components/settings/ModelsTab.vue'
 import { SECTIONS, LABELS } from '../utils/schema'
 
 const TABS: string[] = [...SECTIONS, 'models', 'access']
+const TAB_LABELS: Record<string, string> = {
+  nas: '群晖连接',
+  storage: '存储与缓存',
+  database: '数据库',
+  inference: '推理与加速',
+  detection: '人脸检测',
+  restoration: '画质修复',
+  clustering: '聚类分组',
+  crossref: '比对与建议',
+  security: '安全设置',
+  mcp: 'MCP 接口',
+  models: '模型管理',
+  access: '账号与权限',
+}
 const activeTab = ref<string>(SECTIONS[0])
 const errorSections = ref<string[]>([])
 
@@ -23,7 +37,7 @@ function activate(tab: string): void {
 
 <template>
   <div class="page">
-    <div class="settings-tabs" role="tablist" aria-label="Settings sections">
+    <div class="settings-tabs" role="tablist" aria-label="设置分组">
       <button
         v-for="tab in TABS"
         :key="tab"
@@ -34,7 +48,7 @@ function activate(tab: string): void {
         :aria-selected="activeTab === tab ? 'true' : 'false'"
         @click="activate(tab)"
       >
-        {{ LABELS[tab] || tab }}
+        {{ TAB_LABELS[tab] || LABELS[tab] || tab }}
         <span class="err-dot" aria-hidden="true"></span>
       </button>
     </div>

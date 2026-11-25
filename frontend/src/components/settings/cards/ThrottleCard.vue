@@ -33,10 +33,10 @@ interface ThrottleSnapshot {
 }
 
 const SCOPE_LABELS: Record<string, string> = {
-  password: 'Password',
-  totp: 'Two-step code',
-  change_password: 'Change password',
-  reauth: 'Re-authentication',
+  password: '密码登录',
+  totp: '两步验证码',
+  change_password: '修改密码',
+  reauth: '重新验证身份',
 }
 
 const snap = ref<ThrottleSnapshot | null>(null)
@@ -49,10 +49,10 @@ function scopeLabel(scope: string): string {
 
 function fmtDuration(seconds: number): string {
   if (seconds <= 0) return '—'
-  if (seconds < 60) return `${seconds}s`
+  if (seconds < 60) return `${seconds} 秒`
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
-  return s ? `${m}m ${s}s` : `${m}m`
+  return s ? `${m} 分 ${s} 秒` : `${m} 分钟`
 }
 
 function errMsg(err: unknown, fallback: string): string {
@@ -73,10 +73,10 @@ async function clear(body: { ip: string } | { username: string }, token: string)
   clearing.value = token
   try {
     const res = await postJSON<{ ok: true; cleared: number }>('/api/security/throttles/clear', body)
-    toast(res.cleared > 0 ? `Cleared ${res.cleared} throttle entr${res.cleared === 1 ? 'y' : 'ies'}` : 'Nothing to clear', 'ok')
+    toast(res.cleared > 0 ? `已清除 ${res.cleared} 条限流记录` : '没有可清除的记录', 'ok')
     await load()
   } catch (err) {
-    toast(errMsg(err, 'Could not clear the throttle'), 'error')
+    toast(errMsg(err, '无法清除限流记录'), 'error')
   } finally {
     clearing.value = ''
   }
@@ -87,31 +87,29 @@ onMounted(() => void load())
 
 <template>
   <div class="card throttle-section">
-    <h3>Sign-in throttling</h3>
+    <h3>登录限流</h3>
     <p class="muted">
-      Failed and half-finished sign-ins are throttled per account and per address. This applies to
-      every address that reaches Synopticon, including this machine — there is no exempt address
-      and no way to turn it off short of the limits below.
+      失败或未完成的登录尝试会按账号和 IP 地址分别限流。该策略对访问 Synopticon 的所有地址生效（包括本机），不存在豁免地址，除调整下方阈值外无法关闭。
     </p>
 
     <template v-if="snap">
       <p class="muted counts">
-        Tracking {{ snap.tracked }} of {{ snap.max_tracked }} entries · account limit
-        {{ snap.thresholds.pair_max_attempts }} attempts · address limit
-        {{ snap.thresholds.ip_max_failures }} failures
+        当前追踪 {{ snap.tracked }} / {{ snap.max_tracked }} 条记录 · 单账号上限
+        {{ snap.thresholds.pair_max_attempts }} 次尝试 · 单地址上限
+        {{ snap.thresholds.ip_max_failures }} 次失败
       </p>
 
-      <h4>Blocked accounts</h4>
-      <p v-if="!snap.pairs.length" class="muted">No account is currently blocked.</p>
+      <h4>已锁定账号</h4>
+      <p v-if="!snap.pairs.length" class="muted">当前没有被锁定的账号。</p>
       <div v-else class="table-scroll">
         <table class="data">
           <thead>
             <tr>
-              <th>Scope</th>
-              <th>Address</th>
-              <th>Username</th>
-              <th>Failures</th>
-              <th>Locked for</th>
+              <th>验证环节</th>
+              <th>IP 地址</th>
+              <th>用户名</th>
+              <th>失败 / 尝试</th>
+              <th>剩余锁定</th>
               <th></th>
             </tr>
           </thead>
@@ -129,7 +127,7 @@ onMounted(() => void load())
                   :disabled="clearing !== ''"
                   @click="clear({ username: p.username }, `pair:${p.username}`)"
                 >
-                  {{ clearing === `pair:${p.username}` ? 'Clearing…' : 'Clear account' }}
+                  {{ clearing === `pair:${p.username}` ? '清除中…' : '解除账号限制' }}
                 </button>
               </td>
             </tr>
@@ -137,15 +135,15 @@ onMounted(() => void load())
         </table>
       </div>
 
-      <h4>Blocked addresses</h4>
-      <p v-if="!snap.ips.length" class="muted">No address is currently blocked.</p>
+      <h4>已拦截地址</h4>
+      <p v-if="!snap.ips.length" class="muted">当前没有被拦截的地址。</p>
       <div v-else class="table-scroll">
         <table class="data">
           <thead>
             <tr>
-              <th>Address</th>
-              <th>Failures in window</th>
-              <th>Blocked for</th>
+              <th>IP 地址</th>
+              <th>时间窗内失败次数</th>
+              <th>剩余拦截</th>
               <th></th>
             </tr>
           </thead>
@@ -161,7 +159,7 @@ onMounted(() => void load())
                   :disabled="clearing !== ''"
                   @click="clear({ ip: row.ip }, `ip:${row.ip}`)"
                 >
-                  {{ clearing === `ip:${row.ip}` ? 'Clearing…' : 'Clear address' }}
+                  {{ clearing === `ip:${row.ip}` ? '清除中…' : '解除地址限制' }}
                 </button>
               </td>
             </tr>
@@ -170,11 +168,11 @@ onMounted(() => void load())
       </div>
 
       <p class="muted recovery">
-        Locked out of your own address? Set <code>max_failures_per_address = 0</code> under
-        <code>[security]</code> in config.toml and restart Synopticon, or clear the entry above.
+        如果自己的地址不慎被锁定，可在 <code>config.toml</code> 的 <code>[security]</code> 下设置
+        <code>max_failures_per_address = 0</code> 并重启 Synopticon，或在上方直接清除对应条目。
       </p>
     </template>
-    <p v-else-if="loadFailed" class="muted">Could not load sign-in throttle status.</p>
+    <p v-else-if="loadFailed" class="muted">无法加载登录限流状态。</p>
   </div>
 </template>
 

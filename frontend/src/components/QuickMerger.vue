@@ -26,6 +26,10 @@ interface Status {
 // The HIDE_CODE is quickly typeable to prevent interrupting the flow of merging faces quickly
 const HIDE_CODE = '11'
 const SUGGEST_DEBOUNCE = 300
+const SPACE_LABELS: Record<string, string> = {
+  personal: '个人空间',
+  shared: '共享空间',
+}
 
 const status = ref<Status | null>(null)
 const space = ref('')
@@ -56,7 +60,7 @@ async function loadStatus(): Promise<void> {
     status.value = await getJSON<Status>('/api/quickmerger/status')
     if (!space.value) space.value = status.value.spaces[0] ?? 'personal'
   } catch (e) {
-    toast((e as Error).message || 'Failed to read QuickMerger status', 'error')
+    toast((e as Error).message || '读取未命名人物速并状态失败', 'error')
   }
 }
 
@@ -75,7 +79,7 @@ async function load(refresh = false): Promise<void> {
     await nextTick()
     inputEl.value?.focus()
   } catch (e) {
-    toast((e as Error).message || 'Failed to load people', 'error')
+    toast((e as Error).message || '加载人物列表失败', 'error')
   } finally {
     loading.value = false
   }
@@ -107,12 +111,11 @@ function back(): void {
 async function arm(): Promise<boolean> {
   if (armed) return true
   const ok = await confirm({
-    title: 'QuickMerger writes to the NAS',
+    title: '未命名人物速并会直接写入群晖 NAS',
     message:
-      'Naming and hiding are reversible. Merging an unnamed person into an ' +
-      'existing one is not: the merged person is gone from Synology Photos. ' +
-      'You will not be asked again this session.',
-    okLabel: 'I understand',
+      '命名和隐藏操作可以撤销，但将未命名人物合并到已有的人物中不可撤销——被合并的人物将从群晖照片中消失。' +
+      '本次会话后续操作不再重复提示。',
+    okLabel: '我知道了',
   })
   armed = ok
   return ok
@@ -149,7 +152,7 @@ async function search(prefix: string): Promise<void> {
   } catch (e) {
     if (seq === suggestSeq) {
       suggestions.value = []
-      toast((e as Error).message || 'Suggestion lookup failed', 'error')
+      toast((e as Error).message || '搜索候选人物失败', 'error')
     }
   } finally {
     if (seq === suggestSeq) searching.value = false
@@ -183,7 +186,7 @@ async function write<T>(url: string, body: Record<string, unknown>): Promise<T |
     const msg =
       e instanceof ApiError && typeof e.body?.error === 'string'
         ? e.body.error
-        : (e as Error).message || 'Write failed'
+        : (e as Error).message || '写入失败'
     toast(msg, 'error')
     return null
   } finally {
@@ -209,7 +212,7 @@ async function submit(): Promise<void> {
       target_id: into.id,
     })
     if (res === null) return
-    toast(`Merged #${person.id} into ${into.name}`, 'ok')
+    toast(`已将 #${person.id} 合并至 ${into.name}`, 'ok')
   } else {
     const res = await write('/api/quickmerger/name', {
       space: space.value,
@@ -217,7 +220,7 @@ async function submit(): Promise<void> {
       name: value,
     })
     if (res === null) return
-    toast(`Named #${person.id} ${value}`, 'ok')
+    toast(`已将 #${person.id} 命名为 ${value}`, 'ok')
   }
   advance()
 }
@@ -231,7 +234,7 @@ async function hide(): Promise<void> {
     person_id: person.id,
   })
   if (res === null) return
-  toast(`Hid #${person.id}`, 'ok')
+  toast(`已隐藏 #${person.id}`, 'ok')
   advance()
 }
 
@@ -251,64 +254,63 @@ void loadStatus()
   <section class="card qm">
     <header class="qm-head">
       <div>
-        <h3>QuickMerger</h3>
+        <h3>未命名人物速并</h3>
         <p class="muted">
-          Quickly work through people Synology has not named yet: type a name to set it, pick a suggestion to merge into that person, or hide the ones that are not people at all.
+          快速整理群晖照片中尚未命名的人物：输入新名字即可命名，从联想列表中选择即可并入已有的人物，或直接隐藏非人物误检。
         </p>
       </div>
       <div class="qm-head-actions">
         <label v-if="(status?.spaces.length ?? 0) > 1" class="qm-space">
-          Space
+          空间
           <select class="select" v-model="space" :disabled="loading" @change="loaded = false">
-            <option v-for="s in status?.spaces" :key="s" :value="s">{{ s }}</option>
+            <option v-for="s in status?.spaces" :key="s" :value="s">{{ SPACE_LABELS[s] ?? s }}</option>
           </select>
         </label>
         <button type="button" class="btn" :disabled="loading" @click="load(loaded)">
-          {{ loading ? 'Loading…' : loaded ? 'Reload' : 'Load unnamed people' }}
+          {{ loading ? '加载中…' : loaded ? '重新加载' : '加载未命名人物' }}
         </button>
       </div>
     </header>
 
     <p v-if="status && !status.nas_configured" class="muted">
-      No NAS credentials configured — set them in Settings first.
+      尚未配置群晖 NAS 凭据，请先前往「系统设置」完成配置。
     </p>
 
     <p v-else-if="!loaded && !loading" class="muted">
-      Nothing loaded yet, click 'Load unnamed people' to get started. 
-      The QuickMerger uses a different way to get the faces than the sync job, so you can run this anytime, regardless of the sync status.
+      尚未加载列表，点击「加载未命名人物」即可开始。未命名人物速并直接从群晖获取人脸列表，不依赖同步任务，随时均可使用。
     </p>
 
-    <p v-else-if="loading" class="muted">Fetching people from the NAS…</p>
+    <p v-else-if="loading" class="muted">正在从群晖 NAS 获取人物列表…</p>
 
-    <p v-else-if="!people.length" class="muted">No unnamed people in this space - nothing to do :D</p>
+    <p v-else-if="!people.length" class="muted">当前空间没有未命名人物，无需处理 :D</p>
 
     <p v-else-if="done" class="muted">
-      Processing complete — {{ people.length }} people handled or skipped.
-      <button type="button" class="btn btn-sm" @click="load(true)">Reload list</button>
+      处理完成 — 共处理或跳过 {{ people.length }} 位人物。
+      <button type="button" class="btn btn-sm" @click="load(true)">重新加载列表</button>
     </p>
 
     <template v-else-if="current">
       <div class="qm-thumbs">
         <figure class="qm-fig">
           <img v-if="current.thumb_url" class="qm-thumb" :src="current.thumb_url" alt="" />
-          <div v-else class="qm-thumb qm-thumb-empty">no thumbnail</div>
+          <div v-else class="qm-thumb qm-thumb-empty">无缩略图</div>
           <figcaption class="muted">
             #{{ current.id }}
-            <template v-if="current.item_count != null"> · {{ current.item_count }} photos</template>
+            <template v-if="current.item_count != null"> · {{ current.item_count }} 张照片</template>
           </figcaption>
         </figure>
         <div class="qm-arrow" aria-hidden="true">→</div>
         <figure class="qm-fig">
           <img v-if="target?.thumb_url" class="qm-thumb" :src="target.thumb_url" alt="" />
-          <div v-else class="qm-thumb qm-thumb-empty">Start typing a name to see their preview.</div>
+          <div v-else class="qm-thumb qm-thumb-empty">输入姓名以预览合并目标</div>
           <figcaption class="muted">{{ target ? target.name : '—' }}</figcaption>
         </figure>
       </div>
 
       <p class="qm-progress">
-        Person {{ index + 1 }} / {{ people.length }}
+        第 {{ index + 1 }} / {{ people.length }} 位人物
         <a v-if="current.link" :href="current.link" target="_blank" rel="noreferrer noopener"
-          >View in Synology Photos</a
+          >在群晖照片中查看</a
         >
       </p>
 
@@ -318,14 +320,14 @@ void loadStatus()
         type="text"
         autocomplete="off"
         :disabled="busy"
-        placeholder="Name to set, or search a person to merge into (11 hides)"
+        placeholder="输入新姓名命名，或搜索并入已有的人物（输入 11 直接隐藏）"
         v-model="query"
         @input="onInput"
         @keydown="onKeydown"
       />
 
       <ul v-if="searching || suggestions.length" class="qm-suggestions">
-        <li v-if="searching" class="muted">Searching…</li>
+        <li v-if="searching" class="muted">搜索中…</li>
         <li
           v-for="(s, i) in suggestions"
           :key="s.id"
@@ -338,16 +340,16 @@ void loadStatus()
 
       <div class="qm-actions">
         <button type="button" class="btn" :disabled="index === 0 || busy" @click="back">
-          Previous
+          上一位
         </button>
-        <button type="button" class="btn" :disabled="busy" @click="advance()">Skip</button>
-        <button type="button" class="btn" :disabled="busy" @click="advance(10)">Skip 10</button>
-        <button type="button" class="btn" :disabled="busy" @click="advance(100)">Skip 100</button>
-        <button type="button" class="btn btn-danger" :disabled="busy" @click="hide">Hide</button>
+        <button type="button" class="btn" :disabled="busy" @click="advance()">跳过</button>
+        <button type="button" class="btn" :disabled="busy" @click="advance(10)">跳过 10 位</button>
+        <button type="button" class="btn" :disabled="busy" @click="advance(100)">跳过 100 位</button>
+        <button type="button" class="btn btn-danger" :disabled="busy" @click="hide">隐藏</button>
       </div>
 
       <p class="muted">
-        Enter applies · ↑/↓ pick a merge target · empty Enter skips · typing 11 hides.
+        回车键提交 · ↑/↓ 选择合并目标 · 空回车跳过 · 输入 11 立即隐藏。
       </p>
     </template>
   </section>

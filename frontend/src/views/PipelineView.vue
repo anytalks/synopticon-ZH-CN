@@ -10,13 +10,14 @@ import JobPanel from '../components/JobPanel.vue'
 import { toast } from '../stores/toasts'
 import { useJobs } from '../stores/jobs'
 import { jobLabel } from '../utils/jobs'
+import { jobStateLabel } from '../composables/useJobStream'
 import { ago } from '../utils/time'
 import type { Job } from '../api/types'
 
 const SPACES: [string, string][] = [
-  ['', 'both (default)'],
-  ['personal', 'personal'],
-  ['shared', 'shared'],
+  ['', '全部空间（默认）'],
+  ['personal', '个人空间'],
+  ['shared', '共享空间'],
 ]
 
 type Field =
@@ -38,100 +39,100 @@ interface CardDef {
 const CARDS: CardDef[] = [
   {
     cmd: 'sync',
-    title: 'Sync',
+    title: '同步图库',
     primary: true,
-    desc: 'Pull the photo library, persons and faces from the NAS.',
-    disclosure: 'Options',
+    desc: '从群晖 NAS 拉取照片目录、人物列表及现有人脸数据。',
+    disclosure: '选项',
     fields: [
       { kind: 'space', param: 'space' },
-      { kind: 'check', param: 'hash', label: 'compute content hashes (--hash)' },
-      { kind: 'check', param: 'skip_faces', label: 'skip faces (--skip-faces)' },
-      { kind: 'check', param: 'all_faces', label: 'all faces (--all-faces)' },
-      { kind: 'check', param: 'resume', label: 'resume from last sync', default: true },
+      { kind: 'check', param: 'hash', label: '计算文件内容哈希 (--hash)' },
+      { kind: 'check', param: 'skip_faces', label: '跳过人脸同步 (--skip-faces)' },
+      { kind: 'check', param: 'all_faces', label: '同步全部人脸 (--all-faces)' },
+      { kind: 'check', param: 'resume', label: '从上次同步位置续传', default: true },
     ],
   },
   {
     cmd: 'extract',
-    title: 'Detect faces',
+    title: '人脸检测与提取',
     primary: true,
-    desc: 'Scan synced photos and record every face found in them.',
-    disclosure: 'Options',
+    desc: '扫描已同步的照片，检测并提取其中的所有人脸特征。',
+    disclosure: '选项',
     fields: [
       { kind: 'space', param: 'space' },
-      { kind: 'number', param: 'limit', label: 'Limit', placeholder: 'all', min: 1 },
-      { kind: 'number', param: 'photo_id', label: 'Photo id', placeholder: '—', min: 1 },
+      { kind: 'number', param: 'limit', label: '数量上限', placeholder: '全部', min: 1 },
+      { kind: 'number', param: 'photo_id', label: '照片 ID', placeholder: '—', min: 1 },
       {
         kind: 'check',
         param: 'retry_skipped',
-        label: 'retry photos that could not be read (--retry-skipped)',
+        label: '重试此前无法读取的照片 (--retry-skipped)',
       },
     ],
   },
   {
     cmd: 'cluster',
-    title: 'Group faces',
+    title: '人脸聚类分组',
     primary: true,
-    desc: 'Group the detected faces by person and match them against your Synology people.',
+    desc: '按人物将检测到的人脸聚类分组，并与群晖照片中的人物进行比对。',
     fields: [],
   },
   {
     cmd: 'recluster',
-    title: 'Re-group faces',
+    title: '重新聚类分组',
     primary: false,
-    desc: 'Group the faces again with different settings. Works offline — no NAS access needed.',
-    disclosure: 'Overrides',
+    desc: '使用新参数重新进行人脸聚类分组。纯离线运行，无需访问群晖 NAS。',
+    disclosure: '参数覆盖',
     fields: [],
     overrides: true,
   },
   {
     cmd: 'report',
-    title: 'Report',
+    title: '生成审核报告',
     primary: false,
-    desc: 'Regenerate the static HTML review report.',
-    disclosure: 'Options',
-    fields: [{ kind: 'number', param: 'run_id', label: 'Run id', placeholder: 'latest', min: 1 }],
+    desc: '重新生成静态 HTML 审核报告。',
+    disclosure: '选项',
+    fields: [{ kind: 'number', param: 'run_id', label: '聚类批次 ID', placeholder: '最新', min: 1 }],
   },
   {
     cmd: 'regen-crops',
-    title: 'Regenerate crops',
+    title: '重新生成人脸头像',
     primary: false,
-    desc: 'Rebuild face crop images from stored bboxes.',
-    disclosure: 'Options',
+    desc: '根据已保存的人脸框坐标重新裁切生成人脸头像。',
+    disclosure: '选项',
     fields: [
       { kind: 'space', param: 'space' },
-      { kind: 'check', param: 'only_missing', label: 'only missing crops', default: true },
-      { kind: 'number', param: 'limit', label: 'Limit', placeholder: 'all', min: 1 },
+      { kind: 'check', param: 'only_missing', label: '仅补全缺失的头像', default: true },
+      { kind: 'number', param: 'limit', label: '数量上限', placeholder: '全部', min: 1 },
     ],
   },
   {
     cmd: 'benchmark',
-    title: 'Benchmark',
+    title: '性能基准测试',
     primary: false,
-    desc: 'Measure how fast face detection runs on a sample of photos.',
-    disclosure: 'Options',
+    desc: '抽取部分照片样本，测试当前硬件的人脸检测与提取速度。',
+    disclosure: '选项',
     fields: [
       { kind: 'space', param: 'space' },
-      { kind: 'number', param: 'limit', label: 'Limit', placeholder: 'default', min: 1 },
-      { kind: 'number', param: 'warmup', label: 'Warmup', placeholder: 'default', min: 0 },
+      { kind: 'number', param: 'limit', label: '样本数量', placeholder: '默认', min: 1 },
+      { kind: 'number', param: 'warmup', label: '预热张数', placeholder: '默认', min: 0 },
     ],
   },
   {
     cmd: 'models-download',
-    title: 'Download models',
+    title: '下载模型',
     primary: false,
-    desc: 'Fetch and verify model weights from the manifest.',
-    disclosure: 'Options',
+    desc: '按清单拉取并校验人脸识别模型权重文件。',
+    disclosure: '选项',
     fields: [
       {
         kind: 'text',
         param: 'only',
-        label: 'Only',
-        placeholder: 'comma-separated keys (blank = all)',
+        label: '指定模型',
+        placeholder: '逗号分隔的模型键名（留空表示全部）',
       },
       {
         kind: 'check',
         param: 'allow_record_hash',
-        label: 'record hash of manually-added models (--allow-record-hash)',
+        label: '记录手动放入的模型哈希值 (--allow-record-hash)',
       },
     ],
   },
@@ -210,31 +211,31 @@ const history = computed<Job[]>(() => jobs.history)
 const running = computed(() => jobs.running !== null)
 
 function lastRunText(m: Job): string {
-  if (m.state === 'queued') return 'Queued'
-  if (m.state === 'running') return 'Running now'
-  const text = 'Last ran ' + ago(m.started_at ?? m.created_at)
-  return m.state === 'succeeded' ? text : `${text} · ${m.state}`
+  if (m.state === 'queued') return '排队中'
+  if (m.state === 'running') return '正在运行'
+  const text = '上次运行：' + ago(m.started_at ?? m.created_at)
+  return m.state === 'succeeded' ? text : `${text} · ${jobStateLabel(m.state)}`
 }
 
 function run(card: CardDef): void {
   panel.value
     ?.start(card.cmd, buildParams(card))
     .then(() => void refreshJobs())
-    .catch((err: Error) => toast(err.message || 'Failed to start job', 'error'))
+    .catch((err: Error) => toast(err.message || '启动任务失败', 'error'))
 }
 
 function fmtTime(t: number | null | undefined): string {
-  return t ? new Date(t * 1000).toLocaleString() : '—'
+  return t ? new Date(t * 1000).toLocaleString('zh-CN') : '—'
 }
 
 function fmtDuration(m: Job): string {
   if (!m.started_at) return '—'
   const end = m.ended_at || Date.now() / 1000
   const s = Math.max(0, Math.round(end - m.started_at))
-  if (s < 60) return s + 's'
+  if (s < 60) return `${s}秒`
   const mm = Math.floor(s / 60)
   const ss = s % 60
-  return mm + 'm ' + ss + 's'
+  return `${mm}分 ${ss}秒`
 }
 
 </script>
@@ -245,7 +246,7 @@ function fmtDuration(m: Job): string {
 
     <template v-for="group in GROUPS" :key="group.key">
       <div v-if="group.key === 'ops'" class="ops-divider">
-        <span class="ops-divider-label">Other operations</span>
+        <span class="ops-divider-label">其他操作</span>
       </div>
 
       <div class="cmd-grid" :class="`cmd-grid-${group.key}`">
@@ -271,9 +272,7 @@ function fmtDuration(m: Job): string {
           <div v-if="card.disclosure" class="cmd-opts">
             <template v-if="card.overrides">
               <p class="muted">
-                Only <code>clustering.*</code> / <code>crossref.*</code> keys are accepted (the server
-                validates too). Values are JSON: <code>0.55</code>, <code>true</code>,
-                <code>"cw"</code>.
+                仅接受 <code>clustering.*</code> / <code>crossref.*</code> 配置项（服务端也会校验）。值为 JSON 格式，例如：<code>0.55</code>、<code>true</code>、<code>"cw"</code>。
               </p>
               <div class="kv-editor">
                 <div v-for="(row, i) in overrides[card.cmd]" :key="i" class="kv-row">
@@ -282,7 +281,7 @@ function fmtDuration(m: Job): string {
                   <button
                     type="button"
                     class="btn btn-sm btn-ghost"
-                    aria-label="Remove"
+                    aria-label="移除"
                     @click="removeKv(card.cmd, i)"
                   >
                     &times;
@@ -290,13 +289,13 @@ function fmtDuration(m: Job): string {
                 </div>
               </div>
               <button type="button" class="btn btn-sm" @click="addKv(card.cmd)">
-                + add override
+                + 添加覆盖项
               </button>
             </template>
 
             <template v-for="f in card.fields" :key="f.param">
               <div v-if="f.kind === 'space'" class="opt-row">
-                <label>Space</label>
+                <label>空间</label>
                 <select class="select" v-model="params[card.cmd][f.param]">
                   <option v-for="[v, l] in SPACES" :key="v" :value="v">{{ l }}</option>
                 </select>
@@ -335,7 +334,7 @@ function fmtDuration(m: Job): string {
               :disabled="running"
               @click="run(card)"
             >
-              Run
+              运行
             </button>
             <RouterLink
               v-if="jobs.lastRuns[card.cmd]"
@@ -352,32 +351,32 @@ function fmtDuration(m: Job): string {
     </template>
 
     <div class="card" style="margin-top: var(--sp-4)">
-      <h3>Job history</h3>
+      <h3>历史任务</h3>
       <p v-if="running" class="run-note">
-        A job is running — Run buttons are disabled until it finishes.
+        当前有任务正在运行，完成后才可启动其他任务。
       </p>
       <table class="data history-table">
         <thead>
           <tr>
-            <th>Job</th>
-            <th>State</th>
-            <th>Started at</th>
-            <th>Ended at</th>
-            <th>Duration</th>
+            <th>任务</th>
+            <th>状态</th>
+            <th>开始时间</th>
+            <th>结束时间</th>
+            <th>耗时</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="!history.length">
-            <td colspan="6" class="muted">No jobs yet.</td>
+            <td colspan="6" class="muted">暂无历史任务。</td>
           </tr>
           <tr v-for="m in history" :key="m.id">
             <td class="hist-name">{{ jobLabel(m.name) }}</td>
-            <td><span class="badge" :class="`state-${m.state}`">{{ m.state }}</span></td>
+            <td><span class="badge" :class="`state-${m.state}`">{{ jobStateLabel(m.state) }}</span></td>
             <td class="hist-time">{{ fmtTime(m.started_at) }}</td>
             <td class="hist-time">{{ fmtTime(m.ended_at) }}</td>
             <td>{{ fmtDuration(m) }}</td>
-            <td><RouterLink :to="`/jobs/${m.id}`">view</RouterLink></td>
+            <td><RouterLink :to="`/jobs/${m.id}`">查看</RouterLink></td>
           </tr>
         </tbody>
       </table>

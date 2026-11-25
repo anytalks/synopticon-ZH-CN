@@ -50,8 +50,8 @@ function errMsg(err: unknown, fallback: string): string {
     if (err.status === 429) {
       const retry = (err.body as { retry_after?: number } | null)?.retry_after
       return retry
-        ? `Too many attempts — try again in ${retry}s.`
-        : err.message || 'Too many attempts — try again shortly.'
+        ? `尝试次数过多——请在 ${retry} 秒后重试。`
+        : err.message || '尝试次数过多——请稍后重试。'
     }
     return err.message || fallback
   }
@@ -59,7 +59,7 @@ function errMsg(err: unknown, fallback: string): string {
 }
 
 function fmtTime(t: number | null | undefined): string {
-  return t ? new Date(t * 1000).toLocaleString() : '—'
+  return t ? new Date(t * 1000).toLocaleString('zh-CN') : '—'
 }
 
 const minutesLeft = computed(() => {
@@ -90,7 +90,7 @@ async function loadStatus(): Promise<void> {
 
 async function startEnrolment(fresh: boolean): Promise<void> {
   if (!startPassword.value) {
-    toast('Enter your password to continue', 'error')
+    toast('请输入密码以继续', 'error')
     return
   }
   busy.value = true
@@ -102,7 +102,7 @@ async function startEnrolment(fresh: boolean): Promise<void> {
     confirmCode.value = ''
     renderQr(res.otpauth_uri)
   } catch (err) {
-    toast(errMsg(err, 'Could not start setup'), 'error')
+    toast(errMsg(err, '无法开始设置'), 'error')
   } finally {
     busy.value = false
   }
@@ -120,10 +120,10 @@ async function confirmEnrolment(): Promise<void> {
     pending.value = null
     qrSrc.value = null
     confirmCode.value = ''
-    toast('Two-step sign-in turned on', 'ok')
+    toast('两步验证已开启', 'ok')
     await loadStatus()
   } catch (err) {
-    toast(errMsg(err, 'That code was not accepted'), 'error')
+    toast(errMsg(err, '验证码无效'), 'error')
   } finally {
     busy.value = false
   }
@@ -140,10 +140,10 @@ async function submitDisable(): Promise<void> {
     disableForm.code = ''
     showDisableForm.value = false
     recoveryCodes.value = null
-    toast('Two-step sign-in turned off', 'ok')
+    toast('两步验证已关闭', 'ok')
     await loadStatus()
   } catch (err) {
-    toast(errMsg(err, 'Password or code was not accepted'), 'error')
+    toast(errMsg(err, '密码或验证码无效'), 'error')
   } finally {
     busy.value = false
   }
@@ -160,10 +160,10 @@ async function submitRegen(): Promise<void> {
     regenForm.password = ''
     regenForm.code = ''
     showRegenForm.value = false
-    toast('New backup codes generated', 'ok')
+    toast('已生成新的备用恢复码', 'ok')
     await loadStatus()
   } catch (err) {
-    toast(errMsg(err, 'Password or code was not accepted'), 'error')
+    toast(errMsg(err, '密码或验证码无效'), 'error')
   } finally {
     busy.value = false
   }
@@ -173,7 +173,7 @@ async function copySecret(): Promise<void> {
   if (!pending.value) return
   try {
     await navigator.clipboard.writeText(pending.value.secret_groups)
-    toast('Copied', 'ok')
+    toast('已复制', 'ok')
   } catch {
     /* clipboard access denied — the text is already selectable */
   }
@@ -188,107 +188,107 @@ onMounted(async () => {
 
 <template>
   <div class="card two-step-card">
-    <h3>Two-step sign-in</h3>
+    <h3>两步验证</h3>
 
     <div v-if="status?.enrolled && !pending" class="two-step-status">
       <p class="muted">
-        Turned on{{ status.confirmed_at ? ` on ${fmtTime(status.confirmed_at)}` : '' }}.
+        已开启{{ status.confirmed_at ? `（开启时间：${fmtTime(status.confirmed_at)}）` : '' }}。
       </p>
       <p class="muted">
-        Backup codes remaining: <strong>{{ status.recovery_remaining }}</strong>
-        <template v-if="status.recovery_generated_at">
-          (generated {{ fmtTime(status.recovery_generated_at) }})</template
-        >
+        剩余备用恢复码：<strong>{{ status.recovery_remaining }}</strong>
+        <template v-if="status.recovery_generated_at">（生成时间：{{
+          fmtTime(status.recovery_generated_at)
+        }}）</template>
       </p>
       <p v-if="status.recovery_remaining <= 2" class="warn-line">
-        Running low on backup codes — generate a fresh set before you need one.
+        备用恢复码所剩不多——建议在急需之前重新生成一组。
       </p>
 
       <div class="two-step-actions">
         <button class="btn" type="button" @click="showRegenForm = !showRegenForm">
-          Generate new backup codes
+          重新生成备用恢复码
         </button>
         <button class="btn btn-danger" type="button" @click="showDisableForm = !showDisableForm">
-          Turn off two-step sign-in
+          关闭两步验证
         </button>
       </div>
 
       <form v-if="showRegenForm" class="reauth-form" @submit.prevent="submitRegen">
         <label
-          >Password
+          >当前密码
           <input class="input" type="password" autocomplete="current-password" required v-model="regenForm.password" />
         </label>
         <label
-          >Authenticator code or a backup code
+          >身份验证器验证码或备用恢复码
           <input class="input" type="text" autocomplete="one-time-code" required v-model="regenForm.code" />
         </label>
-        <button class="btn btn-primary" type="submit" :disabled="busy">Generate codes</button>
+        <button class="btn btn-primary" type="submit" :disabled="busy">生成新恢复码</button>
       </form>
 
       <form v-if="showDisableForm" class="reauth-form" @submit.prevent="submitDisable">
         <label
-          >Password
+          >当前密码
           <input class="input" type="password" autocomplete="current-password" required v-model="disableForm.password" />
         </label>
         <label
-          >Authenticator code or a backup code
+          >身份验证器验证码或备用恢复码
           <input class="input" type="text" autocomplete="one-time-code" required v-model="disableForm.code" />
         </label>
-        <button class="btn btn-danger" type="submit" :disabled="busy">Turn off</button>
+        <button class="btn btn-danger" type="submit" :disabled="busy">确认关闭</button>
       </form>
     </div>
 
     <div v-else-if="!pending" class="two-step-enrol">
       <p class="muted">
-        Require a code from an authenticator app (or a backup code) in addition to your password when signing in. Enter your password to get started.
+        开启后，登录时除密码外还需输入身份验证器应用生成的动态码（或备用恢复码）。请输入当前密码开始设置。
       </p>
       <p v-if="status?.pending" class="muted">
-        Setup in progress<template v-if="minutesLeft">, you have {{ minutesLeft }} minute{{ minutesLeft === 1 ? '' : 's' }} left</template>. Enter your password to continue.
+        设置尚未完成<template v-if="minutesLeft">，还剩 {{ minutesLeft }} 分钟过期</template>。请输入当前密码以继续。
       </p>
       <form class="reauth-form" @submit.prevent="startEnrolment(false)">
         <label
-          >Password
+          >当前密码
           <input class="input" type="password" autocomplete="current-password" required v-model="startPassword" />
         </label>
         <div class="two-step-actions" v-if="status?.pending">
-          <button class="btn btn-primary" type="submit" :disabled="busy">Show the code again</button>
-          <button class="btn" type="button" :disabled="busy" @click="startEnrolment(true)">Start over</button>
+          <button class="btn btn-primary" type="submit" :disabled="busy">重新显示二维码</button>
+          <button class="btn" type="button" :disabled="busy" @click="startEnrolment(true)">重新开始</button>
         </div>
         <button v-else class="btn btn-primary" type="submit" :disabled="busy">
-          Turn on two-step sign-in
+          开启两步验证
         </button>
       </form>
     </div>
 
     <div v-else class="two-step-enrol">
-      <p v-if="minutesLeft" class="muted">You have {{ minutesLeft }} minute{{ minutesLeft === 1 ? '' : 's' }} left to complete the two-step authentication setup.</p>
+      <p v-if="minutesLeft" class="muted">请在 {{ minutesLeft }} 分钟内完成两步验证设置。</p>
 
       <div class="enrol-grid">
         <div class="enrol-qr">
-          <img v-if="qrSrc" :src="qrSrc" alt="Two-step sign-in setup code" />
+          <img v-if="qrSrc" :src="qrSrc" alt="两步验证设置二维码" />
           <p v-else class="muted">
-            QR code generation failed, enter the key below by hand instead, or reload the page.
+            二维码生成失败，请在验证器应用中手动输入下方密钥，或刷新页面重试。
           </p>
         </div>
         <div class="enrol-manual">
-          <p class="muted">Can't scan the code? Enter this key manually in your authenticator app:</p>
+          <p class="muted">无法扫描二维码？请在身份验证器应用中手动输入以下密钥：</p>
           <div class="secret-groups" @click="copySecret">{{ pending.secret_groups }}</div>
-          <button class="btn btn-sm" type="button" @click="copySecret">Copy</button>
+          <button class="btn btn-sm" type="button" @click="copySecret">复制</button>
           <p class="muted manual-line">
-            Use the following information for manual setup in your authenticator app<br>
-            Account: {{ pending.manual.account }}<br>
-            Issuer: {{ pending.manual.issuer }}<br>
-            Type: time-based<br>
-            {{ pending.manual.digits }} digits<br>
-            {{ pending.manual.period }} seconds<br>
-            {{ pending.manual.algorithm }}<br>
+            手动添加身份验证器时请使用以下参数：<br>
+            账号：{{ pending.manual.account }}<br>
+            签发方：{{ pending.manual.issuer }}<br>
+            类型：基于时间 (TOTP)<br>
+            位数：{{ pending.manual.digits }} 位<br>
+            周期：{{ pending.manual.period }} 秒<br>
+            算法：{{ pending.manual.algorithm }}<br>
           </p>
         </div>
       </div>
 
       <form class="reauth-form" @submit.prevent="confirmEnrolment">
         <label>
-          Enter the code generated by your authenticator app
+          输入身份验证器应用生成的验证码
           <input
             class="input"
             type="text"
@@ -297,17 +297,17 @@ onMounted(async () => {
             v-model="confirmCode"
           />
         </label>
-        <button class="btn btn-primary" type="submit" :disabled="busy">Confirm</button>
+        <button class="btn btn-primary" type="submit" :disabled="busy">确认开启</button>
       </form>
     </div>
 
     <div v-if="recoveryCodes" class="recovery-reveal">
-      <p><strong>Save these backup codes now, they will not be shown again.</strong></p>
-      <p class="muted">Each one signs you in once, if you lose access to your authenticator.</p>
+      <p><strong>请立即妥善保存这些备用恢复码，关闭后将不再显示。</strong></p>
+      <p class="muted">当你无法使用身份验证器时，每组恢复码均可用于登录一次。</p>
       <ul class="recovery-list">
         <li v-for="c in recoveryCodes" :key="c" class="mono">{{ c }}</li>
       </ul>
-      <button class="btn btn-sm" type="button" @click="recoveryCodes = null">Done</button>
+      <button class="btn btn-sm" type="button" @click="recoveryCodes = null">我已保存</button>
     </div>
   </div>
 </template>

@@ -844,6 +844,27 @@ def bulk_approve(
     return cur.rowcount
 
 
+def bulk_approve_all(
+    conn: Connection, kind: str = "", *, voided: frozenset[int] | None = None
+) -> int:
+    """Approve all non-voided pending rows (optionally filtered by ``kind``).
+
+    Unlike :func:`bulk_approve`, this does not require ``confidence IS NOT NULL``
+    or a confidence threshold, so ``merge`` / ``merge_named`` / ``new_person``
+    items and all-kind approvals are included.
+    """
+    if voided is None:
+        voided = voided_items(conn)
+    where, args = _where(kind, "pending", voided)
+    cur = conn.execute(
+        f"UPDATE review_queue SET status = 'approved', decided_at = ?, "
+        f"decided_by = 'review-ui' {where}",
+        [store.now(), *args],
+    )
+    conn.commit()
+    return cur.rowcount
+
+
 class SpaceMismatch(ValueError):
     """A retarget named a person in a different space than the face lives in."""
 

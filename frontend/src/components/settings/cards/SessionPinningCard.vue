@@ -23,9 +23,9 @@ interface Me {
 }
 
 const MODE_LABELS: Record<string, string> = {
-  off: 'Off',
-  device: 'This device',
-  'device+network': 'This device and network',
+  off: '关闭',
+  device: '绑定当前设备',
+  'device+network': '绑定当前设备与网络',
 }
 
 const info = ref<PinningInfo | null>(null)
@@ -61,7 +61,7 @@ function errMsg(err: unknown, fallback: string): string {
 
 async function save(): Promise<void> {
   if (!form.password) {
-    toast('Enter your password to confirm this change', 'error')
+    toast('请输入密码以确认此更改', 'error')
     return
   }
   saving.value = true
@@ -76,12 +76,12 @@ async function save(): Promise<void> {
     form.code = ''
     const others =
       res.signed_out_others > 0
-        ? ` — ${res.signed_out_others} other session(s) signed out`
+        ? `——已将其余 ${res.signed_out_others} 个会话退出登录`
         : ''
-    toast(`Session pinning set to "${modeLabel(res.mode)}"${others}`, 'ok')
+    toast(`会话绑定已设为「${modeLabel(res.mode)}」${others}`, 'ok')
     await load()
   } catch (err) {
-    toast(errMsg(err, 'Could not update session pinning'), 'error')
+    toast(errMsg(err, '无法更新会话绑定设置'), 'error')
   } finally {
     saving.value = false
   }
@@ -92,55 +92,53 @@ onMounted(() => void load())
 
 <template>
   <div class="card pinning-section">
-    <h3>Session pinning</h3>
+    <h3>会话绑定</h3>
     <p class="muted">
-      Lock down your current session to the browser (and, optionally, the network) that requested it, so a copied/stolen cookie stops working anywhere else.<br><br>
-      Evaluate if session hijacking is part of your threat model - for must users, two-factor authentication will provide ample protection.
-      When first enabled, session pinning will sign out all other sessions for your account.
+      将当前登录会话绑定到发起登录的浏览器（以及可选的所在网络），防止 Cookie 被复制或窃取后在其他地方使用。<br><br>
+      请结合自身安全需求评估是否需要防范会话劫持——对大多数用户而言，开启两步验证已能提供足够防护。首次开启会话绑定时，系统会将当前账号下的其余所有会话退出登录。
     </p>
 
     <template v-if="info">
       <dl class="observed">
-        <dt>This browser</dt>
+        <dt>当前浏览器</dt>
         <dd>{{ info.observed.user_agent || '—' }} <span class="mono">({{ info.observed.device_key }})</span></dd>
-        <dt>This address</dt>
+        <dt>当前地址</dt>
         <dd>{{ info.observed.ip }} <span class="mono">({{ info.observed.network }})</span></dd>
-        <dt>Other signed-in sessions</dt>
+        <dt>其他已登录会话</dt>
         <dd>{{ info.other_sessions }}</dd>
       </dl>
 
       <form class="pinning-form" @submit.prevent="save">
         <label>
-          Pin sessions to
+          会话绑定策略
           <select class="input" v-model="selectedMode">
             <option v-for="m in info.modes" :key="m" :value="m">{{ modeLabel(m) }}</option>
           </select>
         </label>
         <p v-if="selectedMode === 'device+network'" class="warning">
-          Not recommended on mobile or IPv4+IPv6 connections, you will be signed out whenever the network changes.
+          不建议在移动网络或 IPv4/IPv6 双栈环境下使用——只要网络切换，你就会被自动退出登录。
         </p>
 
         <label>
-          Password
+          当前密码
           <input class="input" type="password" autocomplete="current-password" v-model="form.password" required />
         </label>
         <label v-if="totpEnabled">
-          Two-step code (or a backup code)
+          两步验证码（或备用恢复码）
           <input class="input" type="text" inputmode="numeric" autocomplete="one-time-code" v-model="form.code" />
         </label>
 
         <button class="btn btn-primary" type="submit" :disabled="saving">
-          {{ saving ? 'Saving…' : 'Save' }}
+          {{ saving ? '正在保存…' : '保存' }}
         </button>
       </form>
 
       <p class="muted recovery">
-        Signed out unexpectedly because your browser or network changed too often? Run
-        <code>synopticon session-pin off</code> on the server to turn pinning back off for your
-        account without needing to sign in first.
+        如果因浏览器或网络频繁变更而被意外退出登录，可在服务器上运行
+        <code>synopticon session-pin off</code> 直接为账号关闭会话绑定，无需先登录界面。
       </p>
     </template>
-    <p v-else-if="loadFailed" class="muted">Could not load session pinning settings.</p>
+    <p v-else-if="loadFailed" class="muted">无法加载会话绑定设置。</p>
   </div>
 </template>
 

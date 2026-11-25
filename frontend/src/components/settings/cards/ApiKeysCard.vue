@@ -13,7 +13,7 @@ const keyName = ref('')
 const revealedKey = ref('')
 
 function fmtTime(t: number | null | undefined): string {
-  return t ? new Date(t * 1000).toLocaleString() : '—'
+  return t ? new Date(t * 1000).toLocaleString('zh-CN') : '—'
 }
 
 function errMsg(err: unknown, fallback: string): string {
@@ -39,23 +39,23 @@ async function createKey(): Promise<void> {
     revealedKey.value = res.key
     void load()
   } catch (err) {
-    toast(errMsg(err, 'Could not create key'), 'error')
+    toast(errMsg(err, '无法创建密钥'), 'error')
   }
 }
 
 async function revokeKey(id: number, name: string): Promise<void> {
   const ok = await confirm({
-    title: 'Revoke API key',
-    message: `Revoke "${name}"? Any client using it will stop working.`,
-    okLabel: 'Revoke',
+    title: '吊销 API 密钥',
+    message: `确定要吊销“${name}”吗？所有使用该密钥的客户端将立即失效。`,
+    okLabel: '吊销',
   })
   if (!ok) return
   try {
     await postJSON(`/api/auth/keys/${id}/revoke`, {})
-    toast('Key revoked', 'ok')
+    toast('密钥已吊销', 'ok')
     void load()
   } catch (err) {
-    toast(errMsg(err, 'Revoke failed'), 'error')
+    toast(errMsg(err, '吊销失败'), 'error')
   }
 }
 
@@ -64,27 +64,27 @@ onMounted(() => void load())
 
 <template>
   <div class="card keys-section">
-    <h3>API keys</h3>
+    <h3>API 密钥</h3>
     <p class="muted">
-      Full-access keys for automation (e.g. a sidecar extension). The secret is shown once.
+      供自动化脚本或外部工具（如配套扩展）使用的完全访问权限密钥。密钥明文仅显示一次。
     </p>
     <form class="key-form" @submit.prevent="createKey">
       <label style="flex: 1"
-        >Key name
-        <input class="input" type="text" placeholder="my-laptop" required v-model="keyName" />
+        >密钥名称
+        <input class="input" type="text" placeholder="例如：自动化脚本" required v-model="keyName" />
       </label>
-      <button class="btn btn-action" type="submit">Create key</button>
+      <button class="btn btn-action" type="submit">创建密钥</button>
     </form>
     <div v-if="revealedKey" class="key-reveal">
-      New key (copy it now — it will not be shown again):<br />{{ revealedKey }}
+      新密钥（请立即复制，关闭后将不再显示）：<br />{{ revealedKey }}
     </div>
     <table class="data key-table">
       <thead>
         <tr>
-          <th>Name</th>
-          <th>Prefix</th>
-          <th>Created</th>
-          <th>Last used</th>
+          <th>名称</th>
+          <th>前缀</th>
+          <th>创建时间</th>
+          <th>最近使用</th>
           <th></th>
         </tr>
       </thead>
@@ -101,7 +101,7 @@ onMounted(() => void load())
               type="button"
               @click="revokeKey(k.id, k.name)"
             >
-              Revoke
+              吊销
             </button>
           </td>
         </tr>

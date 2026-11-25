@@ -27,9 +27,9 @@ interface ConfirmState {
 
 const state = reactive<ConfirmState>({
   open: false,
-  title: 'Confirm',
+  title: '确认操作',
   message: '',
-  okLabel: 'Confirm',
+  okLabel: '确认',
   danger: true,
   phrase: undefined,
   resolve: null,
@@ -37,9 +37,9 @@ const state = reactive<ConfirmState>({
 
 export function confirm(opts: ConfirmOptions = {}): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
-    state.title = opts.title ?? 'Confirm'
+    state.title = opts.title ?? '确认操作'
     state.message = opts.message ?? ''
-    state.okLabel = opts.okLabel ?? 'Confirm'
+    state.okLabel = opts.okLabel ?? '确认'
     state.danger = opts.danger !== false
     state.phrase = opts.phrase
     state.resolve = resolve

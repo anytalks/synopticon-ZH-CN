@@ -32,7 +32,7 @@ let retryTimer: ReturnType<typeof setInterval> | null = null
 
 const pinBanner = computed(() =>
   route.query.reason === 'pin'
-    ? 'You were signed out because this browser or network changed. If this keeps happening, run "synopticon session-pin off" on the server.'
+    ? '由于当前浏览器或网络环境发生变化，你已被自动退出登录。如果频繁出现此提示，请在服务器上执行 "synopticon session-pin off"。'
     : '',
 )
 
@@ -79,7 +79,7 @@ function messageFrom(e: unknown, fallback: string): string {
 // Every 429 in this contract carries the same three-key body; a single
 // handler keeps the password and code phases from drifting apart.
 function handleRateLimited(e: ApiError): void {
-  error.value = messageFrom(e, 'Too many attempts — try again shortly.')
+  error.value = messageFrom(e, '尝试次数过多，请稍后再试。')
   recovery.value = typeof e.body?.recovery === 'string' ? e.body.recovery : ''
   const retry = typeof e.body?.retry_after === 'number' ? e.body.retry_after : 30
   startRetryCountdown(retry)
@@ -112,7 +112,7 @@ async function submitPassword(): Promise<void> {
     if (e instanceof ApiError && e.status === 429) {
       handleRateLimited(e)
     } else {
-      error.value = messageFrom(e, 'Invalid username or password.')
+      error.value = messageFrom(e, '用户名或密码错误。')
     }
   } finally {
     busy.value = false
@@ -130,10 +130,10 @@ async function submitCode(): Promise<void> {
     if (e instanceof ApiError && e.status === 429) {
       handleRateLimited(e)
     } else if (e instanceof ApiError && e.body?.restart === true) {
-      error.value = messageFrom(e, 'Sign in timed out — start again.')
+      error.value = messageFrom(e, '登录验证已超时，请重新登录。')
       backToPassword()
     } else {
-      error.value = messageFrom(e, 'That code was not accepted.')
+      error.value = messageFrom(e, '验证码无效，请重试。')
       code.value = ''
     }
   } finally {
@@ -149,13 +149,13 @@ async function submitCode(): Promise<void> {
         <img class="brand-mark" src="/img/logo.svg" alt="" aria-hidden="true" />
         <span class="brand-name">Synopticon</span>
       </div>
-      <h1 class="auth-title">Sign in</h1>
+      <h1 class="auth-title">登录</h1>
       <p v-if="pinBanner" class="auth-error" role="status">{{ pinBanner }}</p>
       <p v-if="error" class="auth-error" role="alert">{{ error }}</p>
       <p v-if="recovery" class="auth-hint">{{ recovery }}</p>
 
       <form v-if="phase === 'password'" class="auth-form" @submit.prevent="submitPassword">
-        <label for="username">Username</label>
+        <label for="username">用户名</label>
         <input
           id="username"
           v-model="username"
@@ -163,7 +163,7 @@ async function submitCode(): Promise<void> {
           required
           autofocus
         />
-        <label for="password">Password</label>
+        <label for="password">密码</label>
         <input
           id="password"
           v-model="password"
@@ -176,12 +176,12 @@ async function submitCode(): Promise<void> {
           class="btn btn-action btn-block"
           :disabled="busy || retryAfter > 0"
         >
-          {{ retryAfter > 0 ? `Try again in ${retryAfter}s` : 'Sign in' }}
+          {{ retryAfter > 0 ? `${retryAfter} 秒后重试` : '登录' }}
         </button>
       </form>
 
       <form v-else class="auth-form" @submit.prevent="submitCode">
-        <label for="code">Two-step code</label>
+        <label for="code">两步验证码</label>
         <input
           id="code"
           v-model="code"
@@ -190,16 +190,16 @@ async function submitCode(): Promise<void> {
           required
           autofocus
         />
-        <p class="auth-hint">You can use one of your backup codes here instead.</p>
+        <p class="auth-hint">此处也可以输入你的备用恢复码。</p>
         <button
           type="submit"
           class="btn btn-action btn-block"
           :disabled="busy || retryAfter > 0"
         >
-          {{ retryAfter > 0 ? `Try again in ${retryAfter}s` : 'Verify' }}
+          {{ retryAfter > 0 ? `${retryAfter} 秒后重试` : '验证并登录' }}
         </button>
         <button type="button" class="btn btn-ghost btn-block" @click="backToPassword">
-          Start over
+          返回重新输入密码
         </button>
       </form>
     </div>

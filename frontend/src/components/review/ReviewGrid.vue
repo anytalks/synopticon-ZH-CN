@@ -86,7 +86,7 @@ onUnmounted(() => {
       <ReviewCardSkeleton v-for="n in skeletonCount" :key="`sk-${n}`" />
     </div>
     <div ref="sentinel" class="scroll-sentinel" aria-hidden="true"></div>
-    <p v-if="exhausted" class="muted end-note">End of queue.</p>
+    <p v-if="exhausted" class="muted end-note">已到达队列末尾。</p>
   </div>
 </template>
 

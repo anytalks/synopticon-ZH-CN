@@ -5,40 +5,40 @@
 // the backend before this map catches up still renders as *something*.
 
 const EVENT_LABELS: Record<string, string> = {
-  login: 'Password sign-in',
-  login_code: 'Two-step code',
-  logout: 'Sign-out',
-  create_account: 'Account created',
-  password_change: 'Password change',
-  security_change: 'Security setting changed',
-  api_key: 'API key',
-  mcp_token: 'MCP token',
+  login: '密码登录',
+  login_code: '两步验证码',
+  logout: '退出登录',
+  create_account: '创建账号',
+  password_change: '修改密码',
+  security_change: '修改安全设置',
+  api_key: 'API 密钥',
+  mcp_token: 'MCP 令牌',
 }
 
 const OUTCOME_LABELS: Record<string, string> = {
-  success: 'Success',
-  failure: 'Failed',
-  blocked: 'Blocked',
-  pending: 'Awaiting code',
+  success: '成功',
+  failure: '失败',
+  blocked: '已拦截',
+  pending: '等待验证',
 }
 
 const REASON_LABELS: Record<string, string> = {
-  rate_limited: 'Rate limited',
-  password_ok: 'Password correct — code required',
-  password_bad: 'Password incorrect — code required',
-  bad_credentials: 'Incorrect username or password',
-  missing_credentials: 'Username or password missing',
-  unknown_challenge: 'Sign-in session expired',
-  bad_code: 'Incorrect two-step code',
-  bad_password: 'Incorrect password',
-  totp_enrolled: 'Two-step sign-in turned on',
-  totp_disabled: 'Two-step sign-in turned off',
-  recovery_codes_regenerated: 'Backup codes regenerated',
-  session_pin_changed: 'Session pinning changed',
-  reauth_failed: 'Password or code not accepted',
-  unknown_or_revoked_key: 'Unknown or revoked API key',
-  unknown_or_revoked_token: 'Unknown or revoked MCP token',
-  missing_token: 'No MCP token sent',
+  rate_limited: '触发登录限流',
+  password_ok: '密码正确 — 需输入验证码',
+  password_bad: '密码错误 — 需输入验证码',
+  bad_credentials: '用户名或密码错误',
+  missing_credentials: '未填写用户名或密码',
+  unknown_challenge: '登录验证会话已过期',
+  bad_code: '两步验证码错误',
+  bad_password: '密码错误',
+  totp_enrolled: '已开启两步验证',
+  totp_disabled: '已关闭两步验证',
+  recovery_codes_regenerated: '已重新生成备用恢复码',
+  session_pin_changed: '已更改会话绑定设置',
+  reauth_failed: '密码或验证码未通过校验',
+  unknown_or_revoked_key: 'API 密钥无效或已吊销',
+  unknown_or_revoked_token: 'MCP 令牌无效或已吊销',
+  missing_token: '未提供 MCP 令牌',
 }
 
 export function eventLabel(event: string | null | undefined): string {

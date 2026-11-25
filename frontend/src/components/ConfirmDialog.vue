@@ -56,11 +56,11 @@ function onClose(): void {
       <h3 class="modal-title">{{ state.title }}</h3>
       <p v-if="state.message">{{ state.message }}</p>
       <label v-if="state.phrase" class="modal-phrase">
-        <span>Type "{{ state.phrase }}" to confirm</span>
+        <span>请输入 "{{ state.phrase }}" 以确认</span>
         <input v-model="phraseInput" autocomplete="off" />
       </label>
       <div class="modal-actions">
-        <button class="btn" type="button" autofocus @click="onCancel">Cancel</button>
+        <button class="btn" type="button" autofocus @click="onCancel">取消</button>
         <button
           class="btn"
           type="button"
@@ -94,6 +94,9 @@ function onClose(): void {
 }
 .modal-title {
   margin-bottom: var(--sp-3);
+}
+.modal-body p {
+  white-space: pre-line;
 }
 .modal-phrase {
   margin: var(--sp-3) 0;

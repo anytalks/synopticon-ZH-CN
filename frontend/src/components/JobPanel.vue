@@ -18,6 +18,8 @@ import {
   useJobStream,
   formatDuration,
   formatRate,
+  phaseLabel,
+  jobStateLabel,
   type DoneDetail,
 } from '../composables/useJobStream'
 
@@ -34,25 +36,26 @@ function fmtJobId(id: string): string {
   return /^\d+$/.test(id) ? '#' + id : id
 }
 
-const title = computed(() => (jobId.value ? fmtJobId(jobId.value) : 'Idle'))
+const title = computed(() => (jobId.value ? fmtJobId(jobId.value) : '空闲'))
 const showCancel = computed(() => jobId.value !== null && !finished.value)
 // Show the state for a running job too — previously only terminal states got a
 // chip, so a queued or running job carried no status at all.
-const stateLabel = computed(() => jobState.value ?? meta.value?.state ?? null)
+const rawState = computed(() => jobState.value ?? meta.value?.state ?? null)
+const stateLabel = computed(() => (rawState.value ? jobStateLabel(rawState.value) : null))
 
-/** `sync.faces (personal) · 14,500 / 14,521 (99%) · 12.4/s · ETA 2s` */
+/** `同步人脸数据（个人空间） · 14,500 / 14,521 (99%) · 12.4/秒 · 预计剩余 2秒` */
 const progressText = computed(() => {
   const p = progress.value
   if (!p) return ''
   const parts: string[] = []
   if (p.label) parts.push(p.label)
   if (p.total != null) {
-    parts.push(`${p.done?.toLocaleString()} / ${p.total.toLocaleString()} (${p.pct}%)`)
+    parts.push(`${p.done?.toLocaleString('zh-CN')} / ${p.total.toLocaleString('zh-CN')} (${p.pct}%)`)
   } else if (p.done != null) {
-    parts.push(p.done.toLocaleString())
+    parts.push(p.done.toLocaleString('zh-CN'))
   }
   if (p.rate) parts.push(formatRate(p.rate))
-  if (p.etaSeconds != null && !finished.value) parts.push(`ETA ${formatDuration(p.etaSeconds)}`)
+  if (p.etaSeconds != null && !finished.value) parts.push(`预计剩余 ${formatDuration(p.etaSeconds)}`)
   return parts.join(' · ')
 })
 
@@ -100,7 +103,7 @@ async function cancel(): Promise<void> {
   if (!jobId.value || finished.value) return
   try {
     await postJSON('/api/jobs/' + jobId.value + '/cancel')
-    toast('Cancelling…')
+    toast('正在取消任务…')
   } catch (e) {
     toast((e as Error).message, 'error')
   }
@@ -115,33 +118,33 @@ defineExpose({ start, attach })
 </script>
 
 <template>
-  <section class="job-panel" aria-label="Job progress">
+  <section class="job-panel" aria-label="任务进度">
     <div class="job-panel-head">
       <span class="job-panel-title">{{ title }}</span>
-      <span v-if="stateLabel" class="job-state badge" :class="`state-${stateLabel}`">{{
+      <span v-if="rawState" class="job-state badge" :class="`state-${rawState}`">{{
         stateLabel
       }}</span>
       <span v-if="meta?.name" class="muted mono job-panel-cmd">{{
         (meta.argv || [meta.name]).join(' ')
       }}</span>
       <div class="job-panel-spacer"></div>
-      <span v-if="elapsedText" class="muted mono" aria-label="Elapsed">{{ elapsedText }}</span>
+      <span v-if="elapsedText" class="muted mono" aria-label="已耗时">{{ elapsedText }}</span>
       <button
         v-if="showCancel"
         type="button"
         class="btn btn-sm btn-danger"
         @click="cancel"
       >
-        Cancel
+        取消
       </button>
     </div>
-    <div v-if="phases.length" class="phase-chips" aria-label="Phases">
+    <div v-if="phases.length" class="phase-chips" aria-label="执行阶段">
       <span
         v-for="p in phases"
         :key="p.name"
         class="phase-chip"
         :class="p.status"
-        >{{ p.name }}</span
+        >{{ phaseLabel(p.name) }}</span
       >
     </div>
     <p v-if="failure" class="job-error" role="alert">{{ failure }}</p>
@@ -161,10 +164,10 @@ defineExpose({ start, attach })
         ></div>
       </div>
     </div>
-    <pre ref="logEl" class="job-log" tabindex="0" aria-label="Job log" @scroll="onLogScroll"><div
+    <pre ref="logEl" class="job-log" tabindex="0" aria-label="任务日志" @scroll="onLogScroll"><div
         v-if="logEmpty"
         class="log-placeholder"
-      >{{ finished ? 'no output was recorded for this job' : 'waiting for output…' }}</div><div
+      >{{ finished ? '此任务未记录任何输出' : '等待输出…' }}</div><div
         v-for="line in log"
         :key="line.seq"
         :class="[`log-${line.level}`, line.stream ? `log-stream-${line.stream}` : '']"

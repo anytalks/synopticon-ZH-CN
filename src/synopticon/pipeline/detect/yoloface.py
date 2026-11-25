@@ -102,7 +102,11 @@ class YoloFaceDetector:
             else:
                 inference = inference or InferenceConfig()
                 self.session = create_session(
-                    model_path, inference.device, inference.intra_op_threads, inference.device_id
+                    model_path,
+                    inference.device,
+                    inference.intra_op_threads,
+                    inference.device_id,
+                    allow_coreml=True,
                 )
         if self.session is not None:
             self.input_name = self.session.get_inputs()[0].name

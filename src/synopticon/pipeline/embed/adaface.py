@@ -42,7 +42,11 @@ class AdaFaceEmbedder:
         if session is None:
             inference = inference or InferenceConfig()
             session = create_session(
-                model_path, inference.device, inference.intra_op_threads, inference.device_id
+                model_path,
+                inference.device,
+                inference.intra_op_threads,
+                inference.device_id,
+                allow_coreml=True,
             )
         self.session = session
         self.input_name = session.get_inputs()[0].name

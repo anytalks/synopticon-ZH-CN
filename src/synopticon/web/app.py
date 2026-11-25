@@ -1898,6 +1898,25 @@ def create_app(
 
         return {"approved": await run_in_threadpool(work)}
 
+    @app.post("/api/review/bulk-all")
+    async def api_review_bulk_all(request: Request):
+        body = await request.json()
+        raw_kind = body.get("kind", "")
+        if raw_kind is None:
+            raw_kind = ""
+        if not isinstance(raw_kind, str):
+            return JSONResponse({"error": "kind must be a string"}, status_code=422)
+        kind = raw_kind.strip()
+
+        def work():
+            c = conn()
+            try:
+                return queries.bulk_approve_all(c, kind, voided=voided.get(c))
+            finally:
+                c.close()
+
+        return {"approved": await run_in_threadpool(work)}
+
     @app.get("/api/review/persons")
     def api_review_persons(q: str = "", space: str = "", limit: int = 10):
         if not q.strip():

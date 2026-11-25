@@ -72,6 +72,19 @@ const savedDiffersFromRunning = computed(() => {
   )
 })
 
+const effectiveSummary = computed(() => {
+  const a = access.value
+  if (!a) return ''
+  const entries = a.allowlist.entries
+  if (entries.length) {
+    const bits = [...entries]
+    if (a.allowlist.allow_private) bits.push('所有局域网')
+    bits.push('本机（localhost）')
+    return `当前允许访问：${bits.join('、')}。`
+  }
+  return '当前允许所有地址访问。'
+})
+
 async function load(): Promise<void> {
   loading.value = true
   loadError.value = ''
@@ -83,7 +96,7 @@ async function load(): Promise<void> {
     access.value = a
     saved.value = cfg.values?.security || null
   } catch (err) {
-    loadError.value = err instanceof ApiError ? err.message : 'Could not load access status'
+    loadError.value = err instanceof ApiError ? err.message : '无法加载网络访问状态'
   } finally {
     loading.value = false
   }
@@ -94,22 +107,16 @@ onMounted(() => void load())
 
 <template>
   <div class="card access-section network-access">
-    <h3>Network access</h3>
+    <h3>网络访问控制</h3>
 
-    <p v-if="loading && !access" class="muted">Checking…</p>
+    <p v-if="loading && !access" class="muted">正在检查…</p>
     <p v-else-if="loadError" class="muted error-text">{{ loadError }}</p>
 
     <template v-else-if="access">
       <div v-if="access.proxy.trusts_loopback" class="banner banner-danger">
-        Synopticon trusts the X-Forwarded-For header on connections from this
-        machine. Your reverse proxy MUST overwrite that header —
-        <code>proxy_set_header X-Forwarded-For $remote_addr;</code> for nginx
-        (Caddy and Traefik do it by default). A proxy that passes the
-        visitor's own header through instead — which is what a bare
-        <code>proxy_pass</code> does — lets any visitor claim any address,
-        which switches off the address list and the per-address sign-in
-        limits for whoever asks. Synopticon cannot tell the difference from
-        here; check your proxy config.
+        Synopticon 当前信任来自本机连接中的 X-Forwarded-For 请求头。你的反向代理<strong>必须</strong>覆盖该请求头——例如在 nginx 中配置
+        <code>proxy_set_header X-Forwarded-For $remote_addr;</code>（Caddy 和 Traefik 默认已做此处理）。如果代理直接透传访客自带的请求头（例如未加配置的裸
+        <code>proxy_pass</code>），任何访客都可以伪造任意 IP 地址，从而绕过允许访问列表和按 IP 统计的登录限流。Synopticon 无法从服务端区分这两种情况，请务必核查反向代理配置。
       </div>
 
       <div
@@ -120,64 +127,54 @@ onMounted(() => void load())
         "
         class="banner banner-danger"
       >
-        This request reached Synopticon through a proxy that is not listed in
-        trusted_proxies, so every visitor looks like the same address and the
-        list below is not restricting anyone.
+        当前请求经过了一个未列在 <code>trusted_proxies</code> 中的代理服务器，因此所有访客看起来都来自同一个地址，下方的允许访问列表实际上无法起到限制作用。
       </div>
 
       <div v-else-if="access.proxy.shared_bucket" class="banner banner-warn">
-        Your reverse proxy runs on this machine and is not sending a visitor
-        address, so everyone — including strangers — arrives as 127.0.0.1. The
-        address list cannot restrict anyone and per-address sign-in limits
-        count all your visitors as one. Configure the proxy to overwrite
-        X-Forwarded-For.
+        你的反向代理运行在本机且未传递真实访客地址，导致所有人（包括外部陌生访客）均显示为 127.0.0.1。此时允许访问列表无法限制任何访问，按地址统计的登录限流也会将所有访客合并计数。请配置反向代理以覆盖 X-Forwarded-For 请求头。
       </div>
 
       <div v-if="access.effective.list_adds_nothing" class="banner banner-warn">
-        Every address in your list is already covered by "Always allow local
-        networks" — this list is not restricting anything yet.
+        当前允许列表中的所有地址均已被「始终允许局域网访问」覆盖——该列表目前尚未限制任何地址。
       </div>
 
       <div v-if="savedDiffersFromRunning" class="banner banner-info">
-        Saved. Not in effect until the web process restarts — Settings shows
-        what is on disk, this panel shows what is running.
+        配置已保存，但需重启 Web 服务后才会生效——「安全设置」显示的是磁盘上已保存的配置，本面板显示的是当前运行中的策略。
       </div>
 
-      <p class="summary">{{ access.effective.summary }}</p>
+      <p class="summary">{{ effectiveSummary }}</p>
 
       <table class="data browser-table">
         <tbody>
           <tr>
-            <th>This browser</th>
+            <th>当前浏览器</th>
             <td class="mono">{{ access.client_ip }}</td>
           </tr>
           <tr>
-            <th>Reached through</th>
+            <th>连接方式</th>
             <td>
-              {{ access.effective_source === 'forwarded' ? 'a trusted proxy' : 'a direct connection' }}
+              {{ access.effective_source === 'forwarded' ? '经由受信任的反向代理' : '直连' }}
             </td>
           </tr>
           <tr>
-            <th>Connection peer</th>
+            <th>直连对端地址</th>
             <td class="mono">{{ access.peer }}</td>
           </tr>
           <tr v-if="access.proxy.forwarded_for_present">
-            <th>X-Forwarded-For seen</th>
+            <th>收到的 X-Forwarded-For</th>
             <td class="mono">{{ access.proxy.forwarded_for_raw }}</td>
           </tr>
         </tbody>
       </table>
 
       <p class="muted small">
-        Change the address list and "Always allow local networks" on the
-        Security tab, and <code>trusted_proxies</code> there too if you run a
-        reverse proxy. Locked out? Run
-        <code>synopticon web-access --clear</code> on the server, then restart
-        Synopticon.
+        请在「安全设置」标签页中修改允许访问列表和「始终允许局域网访问」；如果使用了反向代理，也请在那里配置
+        <code>trusted_proxies</code>。若不慎被锁定在外，请在服务器上运行
+        <code>synopticon web-access --clear</code>，然后重启 Synopticon。
       </p>
 
       <button class="btn btn-sm" type="button" :disabled="loading" @click="load">
-        Refresh
+        刷新
       </button>
     </template>
   </div>

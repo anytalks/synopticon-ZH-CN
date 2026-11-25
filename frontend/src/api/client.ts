@@ -17,7 +17,7 @@ export class ApiError extends Error {
   body: ApiErrorBody | null
 
   constructor(status: number, body: ApiErrorBody | null) {
-    super((body && typeof body.error === 'string' && body.error) || `HTTP ${status}`)
+    super((body && typeof body.error === 'string' && body.error) || `请求失败（HTTP ${status}）`)
     this.name = 'ApiError'
     this.status = status
     this.body = body

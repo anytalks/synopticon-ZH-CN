@@ -65,14 +65,18 @@ const target = computed<ReviewPersonSuggestion | null>(() =>
 )
 
 const TITLES: Record<PickerMode, string> = {
-  merge: 'Merge these faces into…',
-  reassign: 'Reassign this face to…',
-  assign: 'Tag this face as…',
+  merge: '将这些人脸并入…',
+  reassign: '将此人脸改判为…',
+  assign: '将此人脸标记为…',
 }
 const VERBS: Record<PickerMode, string> = {
-  merge: 'Merge into',
-  reassign: 'Reassign to',
-  assign: 'Tag as',
+  merge: '并入',
+  reassign: '改判为',
+  assign: '标记为',
+}
+const SPACE_LABELS: Record<string, string> = {
+  personal: '个人空间',
+  shared: '共享空间',
 }
 
 const title = computed(() => TITLES[props.mode])
@@ -125,7 +129,7 @@ async function search(q: string): Promise<void> {
   } catch (e) {
     if (seq === suggestSeq) {
       suggestions.value = []
-      toast((e as Error).message || 'Person lookup failed', 'error')
+      toast((e as Error).message || '人物搜索失败', 'error')
     }
   } finally {
     if (seq === suggestSeq) searching.value = false
@@ -191,7 +195,7 @@ onBeforeUnmount(() => {
         <div class="merge-side">
           <div class="merge-name">
             <strong v-if="target">{{ target.name }}</strong>
-            <span v-else class="muted">pick a person</span>
+            <span v-else class="muted">请选择目标人物</span>
             <HiddenBadge v-if="target?.hidden" cls="name-hidden" />
           </div>
           <div v-if="target && target.crops.length" class="thumb-group">
@@ -210,7 +214,7 @@ onBeforeUnmount(() => {
           <div v-if="target" class="muted">
             #{{ target.person_id }}
             <template v-if="target.item_count != null">
-              · {{ target.item_count }} photos</template
+              · {{ target.item_count }} 张照片</template
             >
           </div>
         </div>
@@ -222,15 +226,15 @@ onBeforeUnmount(() => {
         type="text"
         autocomplete="off"
         :disabled="busy"
-        placeholder="Search people by name"
-        aria-label="Search people by name"
+        placeholder="按姓名搜索已命名人物"
+        aria-label="按姓名搜索已命名人物"
         v-model="query"
         @input="onInput"
         @keydown="onKeydown"
       />
 
       <ul v-if="searching || suggestions.length" class="pick-suggestions">
-        <li v-if="searching" class="muted">Searching…</li>
+        <li v-if="searching" class="muted">搜索中…</li>
         <li
           v-for="(s, i) in suggestions"
           :key="`${s.space}:${s.person_id}`"
@@ -240,36 +244,33 @@ onBeforeUnmount(() => {
         >
           {{ s.name }}
           <span class="muted"
-            >(#{{ s.person_id }} · {{ s.space }}<template
+            >(#{{ s.person_id }} · {{ SPACE_LABELS[s.space] ?? s.space }}<template
               v-if="s.item_count != null"
             >
-              · {{ s.item_count }} photos</template
+              · {{ s.item_count }} 张照片</template
             >)</span
           >
         </li>
       </ul>
       <p v-else-if="query.trim()" class="muted">
-        No named person matches. Unnamed people are named in Utilities → QuickMerger.
+        未找到匹配的已命名人物。未命名人物可在「实用工具 → 未命名人物速并」中命名。
       </p>
 
       <p class="muted pick-note">
         <template v-if="note">{{ note }}</template>
         <template v-else-if="mode === 'merge'"
-          >Queues every face in this group to be tagged as the person you pick. Nothing
-          is written to Synology Photos until you run Apply.</template
+          >将此分组中的所有人脸加入待写回队列并标记为所选人物。执行「写回群晖」前不会修改群晖照片。</template
         >
         <template v-else-if="mode === 'assign'"
-          >Queues this face to be tagged as the person you pick. Nothing is written to
-          Synology Photos until you run Apply.</template
+          >将此人脸加入待写回队列并标记为所选人物。执行「写回群晖」前不会修改群晖照片。</template
         >
         <template v-else
-          >Replaces the suggested person for this one face. Nothing is written to
-          Synology Photos until you run Apply.</template
+          >替换此人脸的原识别建议人物。执行「写回群晖」前不会修改群晖照片。</template
         >
       </p>
 
       <div class="modal-actions">
-        <button class="btn" type="button" @click="close">Cancel</button>
+        <button class="btn" type="button" @click="close">取消</button>
         <button
           class="btn btn-action"
           type="button"

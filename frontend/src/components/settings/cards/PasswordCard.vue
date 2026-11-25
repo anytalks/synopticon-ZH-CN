@@ -14,7 +14,7 @@ function errMsg(err: unknown, fallback: string): string {
 
 async function changePassword(): Promise<void> {
   if (pw.next !== pw.confirm) {
-    toast('New passwords do not match', 'error')
+    toast('两次输入的新密码不一致', 'error')
     return
   }
   try {
@@ -23,30 +23,30 @@ async function changePassword(): Promise<void> {
       new_password: pw.next,
     })
     pw.current = pw.next = pw.confirm = ''
-    toast('Password updated', 'ok')
+    toast('密码已更新', 'ok')
   } catch (err) {
-    toast(errMsg(err, 'Could not change password'), 'error')
+    toast(errMsg(err, '无法修改密码'), 'error')
   }
 }
 </script>
 
 <template>
   <div class="card password-section">
-    <h3>Change password</h3>
+    <h3>修改密码</h3>
     <form class="password-form" @submit.prevent="changePassword">
       <label>
-        <span>Current password</span>
+        <span>当前密码</span>
         <input class="input" type="password" autocomplete="current-password" required v-model="pw.current" />
       </label>
       <label>
-        <span>New password</span>
+        <span>新密码</span>
         <input class="input" type="password" autocomplete="new-password" required v-model="pw.next" />
       </label>
       <label>
-        <span>Confirm new password</span>
+        <span>确认新密码</span>
         <input class="input" type="password" autocomplete="new-password" required v-model="pw.confirm" />
       </label>
-      <button class="btn btn-primary" type="submit">Update password</button>
+      <button class="btn btn-primary" type="submit">更新密码</button>
     </form>
   </div>
 </template>

@@ -40,12 +40,28 @@ const current = computed<ClientReviewItem | null>(
 )
 
 const KIND_ABBREV: Record<string, string> = {
-  assign: 'asn',
-  low_confidence: 'low',
-  reassign: 'rea',
-  merge: 'mrg',
-  merge_named: 'm·n',
-  new_person: 'new',
+  assign: '认领',
+  low_confidence: '复核',
+  reassign: '改判',
+  merge: '合并',
+  merge_named: '名并',
+  new_person: '新人',
+}
+const KIND_LABELS: Record<string, string> = {
+  assign: '归属认领',
+  low_confidence: '低置信度复核',
+  reassign: '改判人物',
+  merge: '合并未命名分组',
+  merge_named: '合并已命名人物',
+  new_person: '发现新人物',
+}
+const STATUS_LABELS: Record<string, string> = {
+  pending: '待审核',
+  approved: '已通过',
+  rejected: '已拒绝',
+  hidden: '已隐藏',
+  applied: '已写回',
+  failed: '写回失败',
 }
 function kindAbbrev(kind: string): string {
   return KIND_ABBREV[kind] || (kind || '?').slice(0, 3)
@@ -97,7 +113,10 @@ function decisionOf(it: ClientReviewItem): string | undefined {
 }
 
 function thumbAria(it: ClientReviewItem): string {
-  let label = `${it.kind}, ${statusOf(it)}`
+  const kindLabel = KIND_LABELS[it.kind] ?? it.kind
+  const st = statusOf(it)
+  const statusLabel = STATUS_LABELS[st] ?? st
+  let label = `${kindLabel}，${statusLabel}`
   const n = names(it)
   if (n.length) label += ` — ${n.join(' ↔ ')}`
   return label
@@ -148,7 +167,7 @@ watch(
       <ReviewCardSkeleton v-else-if="showSkeleton" />
     </div>
     <p v-if="!current && !showSkeleton" class="muted focus-empty">{{ emptyMessage }}</p>
-    <div class="carousel" ref="carouselEl" aria-label="Review queue">
+    <div class="carousel" ref="carouselEl" aria-label="审核队列">
       <template v-if="showSkeleton">
         <div
           v-for="n in 12"

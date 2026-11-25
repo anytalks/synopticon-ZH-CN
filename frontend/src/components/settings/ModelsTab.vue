@@ -25,9 +25,9 @@ function fmtBytes(n: number | null | undefined): string {
 }
 
 function statusLabel(m: ModelStatus): string {
-  if (!m.present) return 'missing'
-  if (!m.registered) return 'not registered'
-  return 'ready'
+  if (!m.present) return '缺失'
+  if (!m.registered) return '未登记'
+  return '已就绪'
 }
 
 function statusClass(m: ModelStatus): string {
@@ -57,25 +57,24 @@ onMounted(() => void load())
 <template>
   <div class="settings-panel">
     <div class="card models-section">
-      <h3>Model weights</h3>
+      <h3>模型权重</h3>
       <p class="muted">
-        Weights the face pipeline needs, in
-        <code v-if="modelsDir">{{ modelsDir }}</code><span v-else>the models directory</span>.
-        <template v-if="loaded"> {{ readyCount }} / {{ items.length }} ready.</template>
+        人脸处理流程所需的模型权重，存放于
+        <code v-if="modelsDir">{{ modelsDir }}</code><span v-else>模型目录</span>。<template
+          v-if="loaded"
+        >已就绪 {{ readyCount }} / {{ items.length }}。</template>
       </p>
       <p v-if="anyUnregistered" class="muted note">
-        Some files are present but not registered in the manifest — run
-        <strong>Download models</strong> on the Pipeline page with
-        <strong>record hash</strong> enabled to register manually-copied weights.
+        部分模型文件已存在，但尚未登记到清单中——请前往「处理流程」页面的<strong>下载模型</strong>卡片，勾选<strong>登记哈希（record hash）</strong>以登记手动复制的权重文件。
       </p>
       <table class="data models-table">
         <thead>
           <tr>
-            <th>Model</th>
-            <th>File</th>
-            <th>Size</th>
-            <th>Status</th>
-            <th>sha256</th>
+            <th>模型</th>
+            <th>文件名</th>
+            <th>大小</th>
+            <th>状态</th>
+            <th>SHA-256</th>
           </tr>
         </thead>
         <tbody>
@@ -87,7 +86,7 @@ onMounted(() => void load())
             <td class="mono sha">{{ m.sha256 ? m.sha256.slice(0, 12) + '…' : '—' }}</td>
           </tr>
           <tr v-if="loaded && !items.length">
-            <td colspan="5" class="muted">No model information available.</td>
+            <td colspan="5" class="muted">暂无模型信息。</td>
           </tr>
         </tbody>
       </table>

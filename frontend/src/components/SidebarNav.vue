@@ -14,16 +14,16 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { id: 'dashboard', to: '/', label: 'Dashboard' },
-  { id: 'pipeline', to: '/pipeline', label: 'Pipeline' },
-  { id: 'review', to: '/review', label: 'Review' },
-  { id: 'apply', to: '/apply', label: 'Apply', separator: true },
-  { id: 'inspect', to: '/inspect', label: 'Inspect' },
-  { id: 'utilities', to: '/utilities', label: 'Utilities' },
-  { id: 'schedules', to: '/schedules', label: 'Schedules' },
-  { id: 'stats', to: '/stats', label: 'Stats', separator: true },
-  { id: 'maintenance', to: '/maintenance', label: 'Maintenance' },
-  { id: 'settings', to: '/settings', label: 'Settings' },
+  { id: 'dashboard', to: '/', label: '概览' },
+  { id: 'pipeline', to: '/pipeline', label: '处理流程' },
+  { id: 'review', to: '/review', label: '人脸审核' },
+  { id: 'apply', to: '/apply', label: '写回群晖', separator: true },
+  { id: 'inspect', to: '/inspect', label: '照片检视' },
+  { id: 'utilities', to: '/utilities', label: '实用工具' },
+  { id: 'schedules', to: '/schedules', label: '定时任务' },
+  { id: 'stats', to: '/stats', label: '数据统计', separator: true },
+  { id: 'maintenance', to: '/maintenance', label: '维护清理' },
+  { id: 'settings', to: '/settings', label: '系统设置' },
 ]
 
 const route = useRoute()
@@ -74,7 +74,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <nav class="sidebar" role="navigation" aria-label="Primary">
+  <nav class="sidebar" role="navigation" aria-label="主导航">
     <RouterLink to="/" class="brand" @click="closeNav">
       <img class="brand-mark" src="/img/logo.svg" alt="" aria-hidden="true" />
       <span class="brand-name">Synopticon</span>
@@ -93,7 +93,7 @@ onUnmounted(() => {
             <span
               v-if="item.id === 'review' && pending"
               class="nav-badge"
-              :aria-label="`${pending} pending`"
+              :aria-label="`${pending} 项待审核`"
             >
               {{ pending }}
             </span>
@@ -110,7 +110,7 @@ onUnmounted(() => {
         :aria-current="isActive('/about') ? 'page' : undefined"
         @click="closeNav"
       >
-        <span class="nav-label">About</span>
+        <span class="nav-label">关于</span>
         <span v-if="version" class="nav-version muted">v{{ version }}</span>
       </RouterLink>
     </div>

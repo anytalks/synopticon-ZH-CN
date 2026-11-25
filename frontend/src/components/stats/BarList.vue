@@ -55,7 +55,7 @@ function readout(item: BarItem): string {
 }
 
 function title(item: BarItem): string {
-  const parts = [`${item.label}: ${readout(item)}`]
+  const parts = [`${item.label}：${readout(item)}`]
   for (const s of item.segments ?? []) {
     if (s.value > 0) parts.push(`${s.label} ${s.value.toLocaleString()}`)
   }
@@ -94,12 +94,12 @@ function title(item: BarItem): string {
         <div class="row-value">
           {{ readout(item) }}
           <span class="sr-only" v-if="item.segments?.length">
-            ({{
+            （{{
               item.segments
                 .filter((s) => s.value > 0)
                 .map((s) => `${s.label} ${s.value.toLocaleString()}`)
-                .join(', ')
-            }})
+                .join('，')
+            }}）
           </span>
         </div>
       </li>

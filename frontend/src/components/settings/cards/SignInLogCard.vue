@@ -64,14 +64,14 @@ const visibleItems = computed(() =>
 )
 
 const rangeLabel = computed(() => {
-  if (!total.value) return '0 of 0'
+  if (!total.value) return '共 0 条'
   const first = offset.value + 1
   const last = Math.min(offset.value + PAGE_SIZE, total.value)
-  return `${first}–${last} of ${total.value}`
+  return `第 ${first}–${last} 条，共 ${total.value} 条`
 })
 
 function formatTime(ts: number): string {
-  return new Date(ts * 1000).toLocaleString()
+  return new Date(ts * 1000).toLocaleString('zh-CN')
 }
 
 function shortUserAgent(ua: string | null): string {
@@ -94,7 +94,7 @@ async function load(): Promise<void> {
     retention.value = data.retention
     bestEffort.value = data.best_effort
   } catch (err) {
-    loadError.value = err instanceof ApiError ? err.message : 'Could not load the sign-in log'
+    loadError.value = err instanceof ApiError ? err.message : '无法加载登录日志'
   } finally {
     loading.value = false
     loaded.value = true
@@ -126,24 +126,24 @@ onMounted(() => void load())
 
 <template>
   <div class="card sign-in-log">
-    <h3>Sign-in log</h3>
+    <h3>登录日志</h3>
 
-    <p v-if="loading && !loaded" class="muted">Loading…</p>
+    <p v-if="loading && !loaded" class="muted">正在加载…</p>
     <p v-else-if="loadError" class="muted error-text">{{ loadError }}</p>
 
     <template v-else>
       <div v-if="retention && !retention.enabled" class="banner banner-warn">
-        New entries are not being recorded. The ones below are kept.
+        当前已停止记录新的登录日志，下方保留此前已记录的条目。
       </div>
 
       <div class="toolbar">
         <label class="toggle">
           <input v-model="showEveryStep" type="checkbox" />
-          Show every step
+          显示全部步骤
         </label>
         <span v-if="ipFilter" class="active-filter muted small">
-          Only <span class="mono">{{ ipFilter }}</span>
-          <button class="btn btn-sm" type="button" @click="clearAddressFilter">Clear</button>
+          仅看 <span class="mono">{{ ipFilter }}</span>
+          <button class="btn btn-sm" type="button" @click="clearAddressFilter">清除</button>
         </span>
       </div>
 
@@ -151,13 +151,13 @@ onMounted(() => void load())
         <table class="data log-table">
           <thead>
             <tr>
-              <th>When</th>
-              <th>Event</th>
-              <th>Outcome</th>
-              <th>Reason</th>
-              <th>Username</th>
-              <th>Address</th>
-              <th>Browser</th>
+              <th>时间</th>
+              <th>事件</th>
+              <th>结果</th>
+              <th>原因</th>
+              <th>用户名</th>
+              <th>IP 地址</th>
+              <th>浏览器</th>
             </tr>
           </thead>
           <tbody>
@@ -176,7 +176,7 @@ onMounted(() => void load())
                   v-if="item.ip"
                   class="link-btn"
                   type="button"
-                  :title="`Only this address: ${item.ip}`"
+                  :title="`仅筛选此地址：${item.ip}`"
                   @click="filterToAddress(item.ip)"
                 >
                   {{ item.ip }}
@@ -186,7 +186,7 @@ onMounted(() => void load())
               <td :title="item.user_agent || ''">{{ shortUserAgent(item.user_agent) || '—' }}</td>
             </tr>
             <tr v-if="!visibleItems.length">
-              <td colspan="7" class="muted">No entries to show.</td>
+              <td colspan="7" class="muted">暂无记录。</td>
             </tr>
           </tbody>
         </table>
@@ -194,7 +194,7 @@ onMounted(() => void load())
 
       <div class="pager">
         <button class="btn btn-sm" type="button" :disabled="offset === 0" @click="prevPage">
-          Previous
+          上一页
         </button>
         <span class="muted small">{{ rangeLabel }}</span>
         <button
@@ -203,13 +203,12 @@ onMounted(() => void load())
           :disabled="offset + PAGE_SIZE >= total"
           @click="nextPage"
         >
-          Next
+          下一页
         </button>
       </div>
 
       <p v-if="bestEffort" class="muted small footnote">
-        Entries are recorded on a best-effort basis; one can be missing if the
-        database was busy.
+        日志以尽力而为方式写入；若数据库当时繁忙，个别条目可能会缺失。
       </p>
     </template>
   </div>

@@ -305,7 +305,25 @@ def run_extract(
         restore_fn = restore.restore_crop
 
     scrfd_session = getattr(getattr(detector, "scrfd", None), "session", None)
-    device = session_device(scrfd_session) if scrfd_session is not None else "CPU"
+    yolo_session = getattr(getattr(detector, "yolo", None), "session", None)
+    embedders = getattr(ensemble, "embedders", None) or {}
+    emb_session = next(
+        (getattr(e, "session", None) for e in embedders.values() if getattr(e, "session", None) is not None),
+        None,
+    )
+    scrfd_dev = session_device(scrfd_session) if scrfd_session is not None else "CPU"
+    yolo_dev = session_device(yolo_session) if yolo_session is not None else None
+    emb_dev = session_device(emb_session) if emb_session is not None else None
+    active_devs = {d for d in (scrfd_dev, yolo_dev, emb_dev) if d is not None}
+    if len(active_devs) == 1:
+        device = next(iter(active_devs))
+    else:
+        parts = [f"scrfd={scrfd_dev}"]
+        if yolo_dev is not None:
+            parts.append(f"yolo={yolo_dev}")
+        if emb_dev is not None:
+            parts.append(f"embed={emb_dev}")
+        device = "+".join(sorted(active_devs)) + f" ({', '.join(parts)})"
     log.info("extract: running on %s (inference.device=%s)", device, settings.inference.device)
 
     crops_dir = settings.storage.crops_dir

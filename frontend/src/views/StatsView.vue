@@ -40,7 +40,7 @@ function useSection<T>(url: string, what: string) {
       s.data = await getJSON<T>(url)
       s.error = ''
     } catch (e) {
-      const msg = (e as Error).message || `Could not load ${what}`
+      const msg = (e as Error).message || `无法加载${what}`
       s.error = msg
       toast(msg, 'error')
     } finally {
@@ -50,8 +50,8 @@ function useSection<T>(url: string, what: string) {
   return { s, load }
 }
 
-const { s: life, load: loadLife } = useSection<LifetimeStats>('/api/stats/lifetime', 'lifetime stats')
-const { s: lib, load: loadLib } = useSection<LibraryStats>('/api/stats/library', 'library stats')
+const { s: life, load: loadLife } = useSection<LifetimeStats>('/api/stats/lifetime', '历史统计数据')
+const { s: lib, load: loadLib } = useSection<LibraryStats>('/api/stats/library', '图库统计数据')
 const { state: jobs } = useJobs()
 
 function refresh(): void {
@@ -77,12 +77,8 @@ interface Fact {
   parts: Part[]
 }
 
-function plural(n: number, one: string, many = one + 's'): string {
-  return `${num(n)} ${n === 1 ? one : many}`
-}
-
 function monthYear(ts: number): string {
-  return new Date(ts * 1000).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+  return new Date(ts * 1000).toLocaleDateString('zh-CN', { month: 'long', year: 'numeric' })
 }
 
 function argmax(xs: number[]): number {
@@ -111,9 +107,9 @@ const lifeFacts = computed<Fact[]>(() => {
     out.push({
       key: 'faces',
       parts: [
-        { text: 'Synopticon has found ' },
+        { text: l.tracking_since ? `自 ${monthYear(l.tracking_since)} 起，Synopticon 累计检测到 ` : 'Synopticon 累计检测到 ' },
         { text: num(l.work.faces_found), strong: true },
-        { text: ` faces${l.tracking_since ? ' since ' + monthYear(l.tracking_since) : ''}.` },
+        { text: ' 张人脸。' },
       ],
     })
   }
@@ -121,9 +117,9 @@ const lifeFacts = computed<Fact[]>(() => {
     out.push({
       key: 'writes',
       parts: [
-        { text: 'It has made ' },
-        { text: plural(l.nas.writes_ok, 'change'), strong: true },
-        { text: ` to your NAS${l.first_nas_write ? ' since ' + fmtDate(l.first_nas_write) : ''}.` },
+        { text: l.first_nas_write ? `自 ${fmtDate(l.first_nas_write)} 起，已向群晖 NAS 写入 ` : '已向群晖 NAS 写入 ' },
+        { text: `${num(l.nas.writes_ok)} 次修改`, strong: true },
+        { text: '。' },
       ],
     })
   }
@@ -131,9 +127,9 @@ const lifeFacts = computed<Fact[]>(() => {
     out.push({
       key: 'time',
       parts: [
-        { text: 'Time spent working: ' },
+        { text: '累计运行时长：' },
         { text: fmtDuration(l.runs.total_seconds), strong: true },
-        { text: ` over ${plural(l.runs.active_days, 'active day')}.` },
+        { text: `，跨越 ${num(l.runs.active_days)} 个活跃日。` },
       ],
     })
   }
@@ -141,10 +137,10 @@ const lifeFacts = computed<Fact[]>(() => {
     out.push({
       key: 'longest',
       parts: [
-        { text: 'Longest run: ' },
+        { text: '耗时最长的任务：' },
         { text: commandLabel(l.runs.longest.command), strong: true },
         {
-          text: `, ${fmtDuration(l.runs.longest.seconds)} on ${fmtDate(l.runs.longest.started_at)}.`,
+          text: `，耗时 ${fmtDuration(l.runs.longest.seconds)}（${fmtDate(l.runs.longest.started_at)}）。`,
         },
       ],
     })
@@ -153,9 +149,9 @@ const lifeFacts = computed<Fact[]>(() => {
     out.push({
       key: 'busiest',
       parts: [
-        { text: 'Busiest day: ' },
+        { text: '最忙碌的一天：' },
         { text: fmtDay(l.runs.busiest_day.date), strong: true },
-        { text: `, with ${plural(l.runs.busiest_day.runs, 'run')}.` },
+        { text: `，共运行 ${num(l.runs.busiest_day.runs)} 次任务。` },
       ],
     })
   }
@@ -163,9 +159,9 @@ const lifeFacts = computed<Fact[]>(() => {
     out.push({
       key: 'streak',
       parts: [
-        { text: 'Currently on a ' },
-        { text: `${num(l.runs.streak_days)}-day`, strong: true },
-        { text: ' streak.' },
+        { text: '当前已连续活跃 ' },
+        { text: `${num(l.runs.streak_days)} 天`, strong: true },
+        { text: '。' },
       ],
     })
   }
@@ -173,9 +169,9 @@ const lifeFacts = computed<Fact[]>(() => {
     out.push({
       key: 'approval',
       parts: [
-        { text: 'You approved ' },
+        { text: '在你审核过的识别建议中，通过率为 ' },
         { text: pct(l.review.approval_rate), strong: true },
-        { text: ' of the suggestions you reviewed.' },
+        { text: '。' },
       ],
     })
   }
@@ -187,59 +183,59 @@ const lifeTiles = computed(() => {
   if (!l) return []
   const r = l.runs
   const runSub = [
-    `${num(r.ok)} ok`,
-    `${num(r.failed)} failed`,
-    r.cancelled ? `${num(r.cancelled)} cancelled` : '',
+    `${num(r.ok)} 次成功`,
+    `${num(r.failed)} 次失败`,
+    r.cancelled ? `${num(r.cancelled)} 次取消` : '',
   ]
     .filter(Boolean)
     .join(' · ')
   return [
     {
-      label: 'Tracking since',
+      label: '统计起始',
       value: fmtMonthOf(l.tracking_since),
-      sub: `${fmtDate(l.tracking_since)} · ${plural(r.active_days, 'active day')}`,
+      sub: `${fmtDate(l.tracking_since)} · ${num(r.active_days)} 个活跃日`,
     },
-    { label: 'Runs', value: num(r.total), sub: runSub },
-    { label: 'Time spent', value: fmtDuration(r.total_seconds), sub: 'of finished runs' },
+    { label: '运行次数', value: num(r.total), sub: runSub },
+    { label: '累计耗时', value: fmtDuration(r.total_seconds), sub: '已完成任务合计' },
     {
-      label: 'Faces found',
+      label: '检出人脸',
       value: num(l.work.faces_found),
-      sub: `in ${plural(l.work.photos_scanned, 'photo scan')}`,
+      sub: `共扫描 ${num(l.work.photos_scanned)} 张次照片`,
     },
     {
-      label: 'NAS changes',
+      label: '群晖写入',
       value: num(l.nas.writes_ok),
-      sub: `${num(l.nas.writes_failed)} failed · ${plural(l.nas.dry_runs, 'dry run')}`,
+      sub: `${num(l.nas.writes_failed)} 次失败 · ${num(l.nas.dry_runs)} 次预演`,
     },
     {
-      label: 'Review decisions',
+      label: '审核决定',
       value: num(l.review.decided),
       sub:
         l.review.approval_rate != null
-          ? `${pct(l.review.approval_rate)} approved`
-          : 'none yet',
+          ? `通过率 ${pct(l.review.approval_rate)}`
+          : '暂无记录',
     },
   ]
 })
 
 const RUN_LEGEND: Array<{ tone: BarTone; label: string }> = [
-  { tone: 'data', label: 'Succeeded' },
-  { tone: 'bad', label: 'Failed' },
-  { tone: 'rest', label: "Cancelled or didn't finish" },
+  { tone: 'data', label: '成功' },
+  { tone: 'bad', label: '失败' },
+  { tone: 'rest', label: '已取消或未完成' },
 ]
 
 const runItems = computed<BarItem[]>(() =>
   (life.data?.runs.by_command ?? []).map((c): BarItem => {
-    const notes = [c.last_run ? 'last ' + ago(c.last_run) : '', c.seconds ? fmtDuration(c.seconds) + ' total' : '']
+    const notes = [c.last_run ? '最近 ' + ago(c.last_run) : '', c.seconds ? '累计 ' + fmtDuration(c.seconds) : '']
     return {
       key: c.command,
       label: commandLabel(c.command),
       value: c.total,
       note: notes.filter(Boolean).join(' · '),
       segments: [
-        { value: c.ok, tone: 'data', label: 'succeeded' },
-        { value: c.failed, tone: 'bad', label: 'failed' },
-        { value: c.cancelled + c.unfinished, tone: 'rest', label: "cancelled or didn't finish" },
+        { value: c.ok, tone: 'data', label: '成功' },
+        { value: c.failed, tone: 'bad', label: '失败' },
+        { value: c.cancelled + c.unfinished, tone: 'rest', label: '已取消或未完成' },
       ],
     }
   }),
@@ -260,24 +256,24 @@ const originItems = computed<BarItem[]>(() => {
   const o = life.data?.runs.by_origin
   if (!o) return []
   return [
-    { key: 'cli', label: 'Command line', value: o.cli },
-    { key: 'gui', label: 'This web GUI', value: o.gui },
-    { key: 'schedule', label: 'A schedule', value: o.schedule },
-    { key: 'mcp', label: 'An agent (MCP)', value: o.mcp ?? 0 },
+    { key: 'cli', label: '命令行 (CLI)', value: o.cli },
+    { key: 'gui', label: 'Web 界面', value: o.gui },
+    { key: 'schedule', label: '定时任务', value: o.schedule },
+    { key: 'mcp', label: 'AI 代理 (MCP)', value: o.mcp ?? 0 },
   ]
 })
 
 const ACTION_LABELS: Record<string, string> = {
-  'assign.add_face': 'Tag a face',
-  'assign.upload_face': 'Tag a face (new box)',
-  'assign.verify': 'Check a tag landed',
-  'reassign.separate': 'Move a face',
-  'reassign.verify': 'Check a move landed',
-  merge: 'Merge people',
-  rename: 'Name a person',
-  set_show: 'Show or hide a person',
-  delete_face: 'Remove a detection',
-  'dedupe.delete': 'Delete a duplicate photo',
+  'assign.add_face': '标记人脸',
+  'assign.upload_face': '标记人脸（新建人脸框）',
+  'assign.verify': '校验标记生效',
+  'reassign.separate': '改判人脸归属',
+  'reassign.verify': '校验改判生效',
+  merge: '合并人物',
+  rename: '命名人物',
+  set_show: '显示或隐藏人物',
+  delete_face: '删除误检人脸',
+  'dedupe.delete': '删除重复照片',
 }
 
 /** Audit actions are `<surface>.<what>`; the surface is shown only when it is not the pipeline. */
@@ -289,7 +285,7 @@ function actionLabel(action: string): string {
   const base =
     ACTION_LABELS[rest] ??
     rest.replace(/[._]/g, ' ').replace(/^./, (ch) => ch.toUpperCase())
-  if (surface === 'quickmerger') return base + ' (QuickMerger)'
+  if (surface === 'quickmerger') return base + '（未命名人物速并）'
   return base
 }
 
@@ -298,10 +294,10 @@ const nasItems = computed<BarItem[]>(() =>
     key: a.action,
     label: actionLabel(a.action),
     value: a.ok + a.failed,
-    valueText: a.failed ? `${num(a.ok)} · ${num(a.failed)} failed` : num(a.ok),
+    valueText: a.failed ? `${num(a.ok)} · ${num(a.failed)} 次失败` : num(a.ok),
     segments: [
-      { value: a.ok, tone: 'data', label: 'succeeded' },
-      { value: a.failed, tone: 'bad', label: 'failed' },
+      { value: a.ok, tone: 'data', label: '成功' },
+      { value: a.failed, tone: 'bad', label: '失败' },
     ],
   })),
 )
@@ -310,11 +306,11 @@ const nasHighlights = computed(() => {
   const n = life.data?.nas
   if (!n) return []
   return [
-    { label: 'Faces tagged', value: n.faces_tagged },
-    { label: 'Faces moved', value: n.faces_moved },
-    { label: 'People merged', value: n.merges },
-    { label: 'People named', value: n.people_named },
-    { label: 'Duplicates deleted', value: n.duplicates_deleted },
+    { label: '已标记人脸', value: n.faces_tagged },
+    { label: '已改判人脸', value: n.faces_moved },
+    { label: '已合并人物', value: n.merges },
+    { label: '已命名人物', value: n.people_named },
+    { label: '已删重复照片', value: n.duplicates_deleted },
   ]
 })
 
@@ -322,14 +318,14 @@ const workRows = computed(() => {
   const w = life.data?.work
   if (!w) return []
   return [
-    { label: 'Photos synced', value: w.photos_synced },
-    { label: 'Photos scanned for faces', value: w.photos_scanned },
-    { label: 'Faces found', value: w.faces_found },
-    { label: 'Faces sharpened by restoration', value: w.faces_restored },
-    { label: 'Photos fingerprinted', value: w.photos_hashed },
-    { label: 'Crops regenerated', value: w.crops_regenerated },
-    { label: 'Duplicate groups found', value: w.duplicate_groups_found },
-    { label: 'Broken review items removed', value: w.queue_items_pruned },
+    { label: '同步照片数', value: w.photos_synced },
+    { label: '已扫描照片数', value: w.photos_scanned },
+    { label: '检测到的人脸', value: w.faces_found },
+    { label: '画质修复增强的人脸', value: w.faces_restored },
+    { label: '已计算指纹的照片', value: w.photos_hashed },
+    { label: '重新生成的人脸头像', value: w.crops_regenerated },
+    { label: '发现的重复照片组', value: w.duplicate_groups_found },
+    { label: '清理的失效审核项', value: w.queue_items_pruned },
   ]
 })
 
@@ -337,20 +333,17 @@ const reviewItems = computed<BarItem[]>(() => {
   const r = life.data?.review
   if (!r) return []
   return [
-    { key: 'approved', label: 'Approved', value: r.approved },
-    { key: 'rejected', label: 'Rejected', value: r.rejected },
-    { key: 'hidden', label: 'Hidden for good', value: r.hidden },
+    { key: 'approved', label: '通过', value: r.approved },
+    { key: 'rejected', label: '拒绝', value: r.rejected },
+    { key: 'hidden', label: '永久隐藏', value: r.hidden },
   ]
 })
 
 // -- library ----------------------------------------------------------------
 
-const WEEKDAYS = Array.from({ length: 7 }, (_, i) =>
-  // 2024-01-01 was a Monday, matching the API's Monday-first order.
-  new Date(Date.UTC(2024, 0, 1 + i)),
-)
-const weekdayLong = WEEKDAYS.map((d) => d.toLocaleDateString(undefined, { weekday: 'long', timeZone: 'UTC' }))
-const weekdayShort = WEEKDAYS.map((d) => d.toLocaleDateString(undefined, { weekday: 'short', timeZone: 'UTC' }))
+// Monday-first order matching the API's by_weekday array.
+const weekdayLong = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日']
+const weekdayShort = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 
 function hourLabel(h: number): string {
   return `${String(h).padStart(2, '0')}:00`
@@ -367,9 +360,9 @@ const libFacts = computed<Fact[]>(() => {
     out.push({
       key: 'main',
       parts: [
-        { text: 'Your main character is ' },
+        { text: '图库主角是 ' },
         { text: mc.name, strong: true, href: mc.person_url },
-        { text: ` — ${pct(mc.share)} of every tagged face.` },
+        { text: ` —— 占全部已标记人脸的 ${pct(mc.share)}。` },
       ],
     })
   }
@@ -377,9 +370,9 @@ const libFacts = computed<Fact[]>(() => {
     out.push({
       key: 'hour',
       parts: [
-        { text: 'Golden hour: most photos are taken around ' },
+        { text: '黄金拍摄时段：大多数照片拍摄于 ' },
         { text: hourLabel(argmax(d.photos.by_hour)), strong: true },
-        { text: '.' },
+        { text: ' 左右。' },
       ],
     })
   }
@@ -387,9 +380,9 @@ const libFacts = computed<Fact[]>(() => {
     out.push({
       key: 'weekday',
       parts: [
-        { text: 'Favourite day to take pictures: ' },
+        { text: '最爱拍照的日子：' },
         { text: weekdayLong[argmax(d.photos.by_weekday)], strong: true },
-        { text: '.' },
+        { text: '。' },
       ],
     })
   }
@@ -397,9 +390,9 @@ const libFacts = computed<Fact[]>(() => {
     out.push({
       key: 'busiest',
       parts: [
-        { text: 'Busiest day ever: ' },
+        { text: '单日拍摄之最：' },
         { text: fmtDay(d.photos.busiest_day.date), strong: true },
-        { text: `, with ${plural(d.photos.busiest_day.count, 'photo')}.` },
+        { text: `，共拍摄 ${num(d.photos.busiest_day.count)} 张照片。` },
       ],
     })
   }
@@ -407,9 +400,9 @@ const libFacts = computed<Fact[]>(() => {
     out.push({
       key: 'oldest',
       parts: [
-        { text: 'Your oldest photo was taken on ' },
+        { text: '最早的一张照片拍摄于 ' },
         { text: fmtTakenDate(d.photos.oldest.time), strong: true, to: d.photos.oldest.inspect },
-        { text: '.' },
+        { text: '。' },
       ],
     })
   }
@@ -417,9 +410,9 @@ const libFacts = computed<Fact[]>(() => {
     out.push({
       key: 'crowded',
       parts: [
-        { text: 'The most crowded photo has ' },
-        { text: plural(d.faces.most_crowded.faces, 'face'), strong: true, to: d.faces.most_crowded.inspect },
-        { text: ' in one frame.' },
+        { text: '人最多的一张合影同框收录了 ' },
+        { text: `${num(d.faces.most_crowded.faces)} 张人脸`, strong: true, to: d.faces.most_crowded.inspect },
+        { text: '。' },
       ],
     })
   }
@@ -434,7 +427,7 @@ const span = computed(() => {
   const b = y(p.newest.time)
   return {
     value: num(b - a + 1),
-    sub: `${fmtTakenDate(p.oldest.time)} to ${fmtTakenDate(p.newest.time)}`,
+    sub: `${fmtTakenDate(p.oldest.time)} 至 ${fmtTakenDate(p.newest.time)}`,
   }
 })
 
@@ -445,34 +438,34 @@ const libTiles = computed(() => {
   const f = d.faces
   const tiles: Array<{ label: string; value: string; sub?: string; to?: string }> = [
     {
-      label: 'Photos',
+      label: '照片总数',
       value: num(p.total),
-      sub: fmtBytes(p.bytes) + (p.deleted ? ` · ${num(p.deleted)} deleted` : ''),
+      sub: fmtBytes(p.bytes) + (p.deleted ? ` · ${num(p.deleted)} 张已删除` : ''),
     },
   ]
-  if (span.value) tiles.push({ label: 'Years of photos', value: span.value.value, sub: span.value.sub })
+  if (span.value) tiles.push({ label: '跨度年数', value: span.value.value, sub: span.value.sub })
   tiles.push(
     {
-      label: 'Faces detected',
+      label: '检出人脸',
       value: num(f.detected),
-      sub: `${num(f.synology_tagged)} tagged by Synology`,
+      sub: `群晖照片已标记 ${num(f.synology_tagged)} 张`,
     },
     {
-      label: 'Named people',
+      label: '已命名人物',
       value: num(d.people.listed_named),
-      sub: d.people.hidden ? `${num(d.people.hidden)} hidden in Synology` : undefined,
+      sub: d.people.hidden ? `群晖中已隐藏 ${num(d.people.hidden)} 位` : undefined,
     },
     {
-      label: 'Nobody in them',
+      label: '无人物照片',
       value: num(f.photos_without_faces),
       sub: f.photos_scanned
-        ? `${pct(f.photos_without_faces / f.photos_scanned)} of scanned photos`
-        : 'not scanned yet',
+        ? `占已扫描照片的 ${pct(f.photos_without_faces / f.photos_scanned)}`
+        : '尚未扫描',
     },
     {
-      label: 'Duplicate copies',
+      label: '重复副本',
       value: num(p.duplicate_copies),
-      sub: 'byte-identical extras',
+      sub: '字节完全相同的多余文件',
       to: p.duplicate_copies ? '/utilities' : undefined,
     },
   )
@@ -504,10 +497,10 @@ const growthColumns = computed<Column[]>(() =>
 )
 
 const TYPE_LABELS: Record<string, string> = {
-  photo: 'Photos',
-  video: 'Videos',
-  live: 'Live photos',
-  other: 'Other',
+  photo: '照片',
+  video: '视频',
+  live: '实况照片',
+  other: '其他',
 }
 
 const typeItems = computed<BarItem[]>(() => {
@@ -519,8 +512,8 @@ const typeItems = computed<BarItem[]>(() => {
 })
 
 function spaceLabel(space: string): string {
-  if (space === 'personal') return 'Personal space'
-  if (space === 'shared') return 'Shared space'
+  if (space === 'personal') return '个人空间'
+  if (space === 'shared') return '共享空间'
   return space
 }
 
@@ -536,25 +529,25 @@ const faceItems = computed<BarItem[]>(() => {
   const f = lib.data?.faces
   if (!f) return []
   return [
-    { key: 'tagged', label: 'Tagged in Synology Photos', value: f.synology_tagged },
-    { key: 'named', label: '…on a named person', value: f.synology_named },
-    { key: 'detected', label: 'Detected by Synopticon', value: f.detected },
-    { key: 'restored', label: 'Sharpened by restoration', value: f.restored },
+    { key: 'tagged', label: '群晖照片已标记', value: f.synology_tagged },
+    { key: 'named', label: '……归属已命名人物', value: f.synology_named },
+    { key: 'detected', label: 'Synopticon 检出人脸', value: f.detected },
+    { key: 'restored', label: '经画质修复增强', value: f.restored },
   ]
 })
 
 const perPhotoColumns = computed<Column[]>(() =>
   (lib.data?.faces.per_photo ?? []).map((b) => ({
-    label: `${b.bucket} ${b.bucket === '1' ? 'face' : 'faces'}`,
+    label: `${b.bucket} 张人脸`,
     axis: b.bucket,
     value: b.photos,
   })),
 )
 
 const DETECTOR_LABELS: Record<string, string> = {
-  scrfd: 'SCRFD only',
-  yolo: 'YOLO only',
-  merged: 'Both detectors agreed',
+  scrfd: '仅 SCRFD 检出',
+  yolo: '仅 YOLO 检出',
+  merged: '双检测器共同确认',
 }
 
 const detectorItems = computed<BarItem[]>(() => {
@@ -574,21 +567,21 @@ const curiosities = computed(() => {
   const f = lib.data?.faces
   if (!f) return []
   const out: Array<{ label: string; value: string; to?: string | null }> = []
-  if (f.avg_per_photo != null) out.push({ label: 'Faces per photo, on average', value: f.avg_per_photo.toFixed(2) })
+  if (f.avg_per_photo != null) out.push({ label: '平均每张照片人脸数', value: f.avg_per_photo.toFixed(2) })
   if (f.most_crowded) {
-    out.push({ label: 'Most crowded photo', value: plural(f.most_crowded.faces, 'face'), to: f.most_crowded.inspect })
+    out.push({ label: '最拥挤的合影', value: `${num(f.most_crowded.faces)} 张人脸`, to: f.most_crowded.inspect })
   }
   if (f.tiniest) {
     out.push({
-      label: 'Tiniest face',
+      label: '最小人脸',
       value: `${num(f.tiniest.width)} × ${num(f.tiniest.height)} px`,
       to: f.tiniest.inspect,
     })
   }
   if (f.sharpest_eye) {
     out.push({
-      label: 'Most confident detection',
-      value: (f.sharpest_eye.det_score * 100).toFixed(1) + '% sure',
+      label: '最高置信度检测',
+      value: `置信度 ${(f.sharpest_eye.det_score * 100).toFixed(1)}%`,
       to: f.sharpest_eye.inspect,
     })
   }
@@ -613,17 +606,17 @@ const peopleWhole = computed(() => {
   const shown = p.distribution.length
   const top = p.distribution.reduce((sum, d) => sum + d.faces, 0)
   const segments: BarSegment[] = [
-    { value: top, tone: 'data', label: `top ${shown}` },
+    { value: top, tone: 'data', label: `前 ${shown} 位` },
     {
       value: p.everyone_else.faces,
       tone: 'rest',
-      label: `everyone else (${plural(p.everyone_else.people, 'person', 'people')})`,
+      label: `其余人物（${num(p.everyone_else.people)} 位）`,
     },
-    { value: p.unnamed_or_unlisted_faces, tone: 'faint', label: 'unnamed or unlisted' },
+    { value: p.unnamed_or_unlisted_faces, tone: 'faint', label: '未命名或未列出' },
   ]
   const item: BarItem = {
     key: 'whole',
-    label: 'Every tagged face',
+    label: '全部已标记人脸',
     value: tagged,
     valueText: num(tagged),
     segments,
@@ -637,20 +630,20 @@ const peopleWhole = computed(() => {
 const concentration = computed(() => {
   const g = lib.data?.people.gini
   if (g == null) return ''
-  if (g < 0.35) return 'Faces are spread fairly evenly across your people.'
-  if (g < 0.6) return 'A handful of people show up a lot more than the rest.'
-  return 'A few people dominate your library.'
+  if (g < 0.35) return '人脸在各位人物之间分布比较均匀。'
+  if (g < 0.6) return '少数几位人物的出镜率明显高于其他人。'
+  return '图库中绝大多数人脸集中在极少数人物身上。'
 })
 
 const groupingRows = computed(() => {
   const g = lib.data?.grouping
   if (!g) return []
   return [
-    { label: 'Face groups', value: num(g.clusters) },
-    { label: 'Largest group', value: plural(g.largest, 'face') },
-    { label: 'Single-face groups', value: num(g.singletons) },
-    { label: 'Matched to a person', value: num(g.mapped) },
-    { label: 'Not matched yet', value: num(g.unmapped) },
+    { label: '人脸分组数', value: num(g.clusters) },
+    { label: '最大分组', value: `${num(g.largest)} 张人脸` },
+    { label: '单人脸分组', value: num(g.singletons) },
+    { label: '已匹配人物', value: num(g.mapped) },
+    { label: '尚未匹配', value: num(g.unmapped) },
   ]
 })
 </script>
@@ -660,9 +653,9 @@ const groupingRows = computed(() => {
     <!-- ================= What Synopticon has done ================= -->
     <section class="stats-section" aria-labelledby="life-h" :class="{ refreshing: life.loading && life.data }">
       <header class="section-head">
-        <h2 id="life-h">What Synopticon has done</h2>
+        <h2 id="life-h">Synopticon 运行统计</h2>
         <p v-if="life.data?.tracking_since" class="muted">
-          Counting since {{ fmtDate(life.data.tracking_since) }}
+          自 {{ fmtDate(life.data.tracking_since) }} 起统计
         </p>
       </header>
 
@@ -671,18 +664,17 @@ const groupingRows = computed(() => {
       </div>
 
       <div v-else-if="!life.data && life.error" class="card">
-        <p class="muted">Couldn't load these numbers: {{ life.error }}</p>
-        <button type="button" class="btn btn-sm" @click="loadLife">Try again</button>
+        <p class="muted">无法加载统计数据：{{ life.error }}</p>
+        <button type="button" class="btn btn-sm" @click="loadLife">重试</button>
       </div>
 
       <div v-else-if="lifeEmpty" class="card empty-card">
-        <h3>Nothing to count yet</h3>
+        <h3>暂无运行记录</h3>
         <p class="muted">
-          Synopticon keeps a tally of every command it runs and every change it writes to your NAS. Run a sync from
-          the Pipeline page and this fills in.
+          Synopticon 会记录每次执行的任务以及写回群晖 NAS 的每一项修改。前往「处理流程」页面运行一次「同步图库」后，这里就会显示统计数据。
         </p>
         <div class="cta-row">
-          <RouterLink class="btn btn-action" to="/pipeline">Open the Pipeline</RouterLink>
+          <RouterLink class="btn btn-action" to="/pipeline">前往处理流程</RouterLink>
         </div>
       </div>
 
@@ -706,21 +698,21 @@ const groupingRows = computed(() => {
 
         <div class="two-col">
           <section class="card">
-            <h3>Runs by operation</h3>
+            <h3>按操作统计运行次数</h3>
             <BarList
               v-if="runItems.length"
               :items="runItems"
               :legend="runLegend"
-              label="Runs per operation, split by outcome"
+              label="按操作与结果统计的运行次数"
             />
-            <p v-else class="muted">No runs recorded yet.</p>
+            <p v-else class="muted">暂无运行记录。</p>
 
-            <h4 class="sub-head">Started from</h4>
-            <BarList :items="originItems" label="Where runs were started" />
+            <h4 class="sub-head">触发来源</h4>
+            <BarList :items="originItems" label="任务触发来源" />
           </section>
 
           <section class="card">
-            <h3>Written to your NAS</h3>
+            <h3>已写回群晖 NAS</h3>
             <template v-if="life.data.nas.writes_ok + life.data.nas.writes_failed > 0">
               <dl class="kv kv-grid">
                 <div v-for="h in nasHighlights" :key="h.label">
@@ -728,31 +720,31 @@ const groupingRows = computed(() => {
                   <dd>{{ num(h.value) }}</dd>
                 </div>
               </dl>
-              <h4 class="sub-head">Every change, by kind</h4>
+              <h4 class="sub-head">按操作类型分布</h4>
               <BarList
                 :items="nasItems"
                 :legend="
                   life.data.nas.writes_failed
                     ? [
-                        { tone: 'data', label: 'Succeeded' },
-                        { tone: 'bad', label: 'Failed' },
+                        { tone: 'data', label: '成功' },
+                        { tone: 'bad', label: '失败' },
                       ]
                     : undefined
                 "
-                label="NAS changes by kind"
+                label="按类型统计的群晖修改"
               />
             </template>
             <p v-else class="muted">
-              Nothing written yet — everything before Apply only reads from your NAS.
+              尚未向群晖写入任何修改——在「写回群晖」之前的所有步骤都只读取数据。
               <template v-if="life.data.nas.dry_runs">
-                {{ plural(life.data.nas.dry_runs, 'dry run') }} so far.
+                目前已执行 {{ num(life.data.nas.dry_runs) }} 次预演。
               </template>
             </p>
           </section>
 
           <section class="card">
-            <h3>Behind the scenes</h3>
-            <p class="muted card-lede">Lifetime totals, re-scans included.</p>
+            <h3>后台处理累计</h3>
+            <p class="muted card-lede">历史累计总量（包含重复扫描）。</p>
             <dl class="kv">
               <div v-for="w in workRows" :key="w.label">
                 <dt>{{ w.label }}</dt>
@@ -762,17 +754,16 @@ const groupingRows = computed(() => {
           </section>
 
           <section class="card">
-            <h3>Your review decisions</h3>
+            <h3>人脸审核记录</h3>
             <template v-if="life.data.review.decided > 0">
-              <BarList :items="reviewItems" label="Review decisions" />
+              <BarList :items="reviewItems" label="人脸审核决定" />
               <p v-if="life.data.review.approval_rate != null" class="muted card-foot">
-                {{ pct(life.data.review.approval_rate) }} of suggestions approved, out of
-                {{ plural(life.data.review.decided, 'decision') }}.
+                共完成 {{ num(life.data.review.decided) }} 条审核决定，识别建议通过率为
+                {{ pct(life.data.review.approval_rate) }}。
               </p>
             </template>
             <p v-else class="muted">
-              No decisions yet. Suggestions show up on the <RouterLink to="/review">Review</RouterLink> page after
-              faces are grouped.
+              暂无审核记录。完成人脸聚类分组后，识别建议会出现在<RouterLink to="/review">人脸审核</RouterLink>页面。
             </p>
           </section>
         </div>
@@ -782,8 +773,8 @@ const groupingRows = computed(() => {
     <!-- ======================== Your library ======================== -->
     <section class="stats-section" aria-labelledby="lib-h" :class="{ refreshing: lib.loading && lib.data }">
       <header class="section-head">
-        <h2 id="lib-h">Your library</h2>
-        <p v-if="lib.data" class="muted">As of {{ new Date(lib.data.computed_at * 1000).toLocaleString() }}</p>
+        <h2 id="lib-h">你的照片图库</h2>
+        <p v-if="lib.data" class="muted">统计时间：{{ new Date(lib.data.computed_at * 1000).toLocaleString('zh-CN') }}</p>
       </header>
 
       <div v-if="!lib.data && lib.loading" aria-busy="true">
@@ -794,18 +785,17 @@ const groupingRows = computed(() => {
       </div>
 
       <div v-else-if="!lib.data && lib.error" class="card">
-        <p class="muted">Couldn't load library stats: {{ lib.error }}</p>
-        <button type="button" class="btn btn-sm" @click="loadLib">Try again</button>
+        <p class="muted">无法加载图库统计：{{ lib.error }}</p>
+        <button type="button" class="btn btn-sm" @click="loadLib">重试</button>
       </div>
 
       <div v-else-if="libEmpty" class="card empty-card">
-        <h3>No photos synced yet</h3>
+        <h3>尚未同步照片</h3>
         <p class="muted">
-          Once Synopticon has synced your library from the NAS, this is where you find out who your main character
-          is.
+          从群晖 NAS 同步图库后，这里就会揭晓你相册里的“头号主角”以及更多图库洞察。
         </p>
         <div class="cta-row">
-          <RouterLink class="btn btn-action" to="/pipeline">Run your first sync</RouterLink>
+          <RouterLink class="btn btn-action" to="/pipeline">开始首次同步</RouterLink>
         </div>
       </div>
 
@@ -834,54 +824,54 @@ const groupingRows = computed(() => {
           />
         </div>
 
-        <h3 class="group-head">Photos</h3>
+        <h3 class="group-head">照片分布</h3>
         <section class="card">
-          <h3>Photos per year</h3>
-          <p class="muted card-lede">By the date each photo was taken.</p>
-          <ColumnChart :columns="yearColumns" label="Photos per year" unit="photos" />
+          <h3>按年份统计</h3>
+          <p class="muted card-lede">按照片实际拍摄日期统计。</p>
+          <ColumnChart :columns="yearColumns" label="按年份统计照片数" unit="张" />
         </section>
 
         <div class="two-col">
           <section class="card">
-            <h3>Time of day</h3>
-            <p class="muted card-lede">The hour each photo was taken.</p>
-            <ColumnChart :columns="hourColumns" label="Photos by hour of day" unit="photos" />
+            <h3>拍摄时段分布</h3>
+            <p class="muted card-lede">按拍摄小时分布。</p>
+            <ColumnChart :columns="hourColumns" label="按小时统计照片数" unit="张" />
           </section>
           <section class="card">
-            <h3>Day of the week</h3>
-            <p class="muted card-lede">The weekday each photo was taken.</p>
-            <ColumnChart :columns="weekdayColumns" label="Photos by day of the week" unit="photos" />
+            <h3>星期分布</h3>
+            <p class="muted card-lede">按拍摄星期分布。</p>
+            <ColumnChart :columns="weekdayColumns" label="按星期统计照片数" unit="张" />
           </section>
         </div>
 
         <div class="two-col">
           <section class="card">
-            <h3>Library growth</h3>
-            <p class="muted card-lede">Photos in Synology Photos over time, by when they were added.</p>
+            <h3>图库增长趋势</h3>
+            <p class="muted card-lede">按添加时间统计群晖照片图库的累计规模变化。</p>
             <ColumnChart
               :columns="growthColumns"
               variant="area"
               highlight="last"
-              label="Library size over time"
-              unit="photos"
+              label="图库随时间的规模增长"
+              unit="张"
             />
           </section>
           <section class="card">
-            <h3>What's in it</h3>
-            <BarList v-if="typeItems.length" :items="typeItems" label="Library by file type" />
-            <p v-else class="muted">No file types recorded.</p>
+            <h3>图库构成</h3>
+            <BarList v-if="typeItems.length" :items="typeItems" label="按文件类型统计" />
+            <p v-else class="muted">暂无文件类型记录。</p>
             <template v-if="spaceItems.length > 1">
-              <h4 class="sub-head">By space</h4>
-              <BarList :items="spaceItems" label="Library by space" />
+              <h4 class="sub-head">按空间分布</h4>
+              <BarList :items="spaceItems" label="按空间统计" />
             </template>
           </section>
         </div>
 
-        <h3 class="group-head">Faces</h3>
+        <h3 class="group-head">人脸分析</h3>
         <div class="two-col">
           <section class="card">
-            <h3>Faces in your library</h3>
-            <BarList :items="faceItems" label="Face counts" />
+            <h3>图库中的人脸</h3>
+            <BarList :items="faceItems" label="人脸数量统计" />
             <dl v-if="curiosities.length" class="kv curiosities">
               <div v-for="c in curiosities" :key="c.label">
                 <dt>{{ c.label }}</dt>
@@ -894,74 +884,73 @@ const groupingRows = computed(() => {
           </section>
 
           <section class="card">
-            <h3>Faces per photo</h3>
+            <h3>单张照片人脸数分布</h3>
             <template v-if="lib.data.faces.photos_scanned > 0">
               <p class="muted card-lede">
-                Across {{ plural(lib.data.faces.photos_scanned, 'scanned photo') }}.
+                基于已扫描的 {{ num(lib.data.faces.photos_scanned) }} 张照片。
               </p>
               <ColumnChart
                 :columns="perPhotoColumns"
-                label="Photos by number of faces in them"
-                unit="photos"
+                label="按人脸数量统计照片数"
+                unit="张"
               />
               <template v-if="detectorItems.length">
-                <h4 class="sub-head">Which detector found them</h4>
-                <BarList :items="detectorItems" label="Faces by detector" />
+                <h4 class="sub-head">检测器贡献分布</h4>
+                <BarList :items="detectorItems" label="按检测器统计人脸" />
               </template>
             </template>
             <p v-else class="muted">
-              Faces haven't been detected yet. Run <strong>Detect faces</strong> from the
-              <RouterLink to="/pipeline">Pipeline</RouterLink> page.
+              尚未进行人脸检测。请前往<RouterLink to="/pipeline">处理流程</RouterLink>页面运行<strong>人脸检测与提取</strong>。
             </p>
           </section>
         </div>
 
-        <h3 class="group-head">People</h3>
+        <h3 class="group-head">人物分布</h3>
         <section class="card">
-          <h3>Who shows up most</h3>
+          <h3>出镜最多的人物</h3>
           <template v-if="lib.data.faces.synology_tagged > 0">
             <p class="muted card-lede">
-              Share of every face Synology Photos has tagged, across
-              {{ plural(lib.data.people.listed_named, 'named person', 'named people') }}.
+              占群晖照片全部已标记人脸的比例，涵盖
+              {{ num(lib.data.people.listed_named) }} 位已命名人物。
             </p>
             <BarList
               v-if="peopleWhole"
               class="people-whole"
               :items="peopleWhole.items"
               :legend="peopleWhole.legend"
-              label="Every tagged face, by who it belongs to"
+              label="全部已标记人脸的归属占比"
             />
-            <BarList :items="peopleItems" label="Tagged faces per person" />
+            <BarList :items="peopleItems" label="各人物已标记人脸数" />
             <dl class="kv kv-grid people-facts">
               <div v-if="lib.data.people.listed_named >= 10">
-                <dt>Top 10 hold</dt>
+                <dt>前 10 位人物占比</dt>
                 <dd>{{ pct(lib.data.people.top10_share) }}</dd>
               </div>
               <div>
-                <dt>Named people with a single face</dt>
+                <dt>仅含 1 张人脸的已命名人物</dt>
                 <dd>{{ num(lib.data.people.one_face_people) }}</dd>
               </div>
               <div v-if="lib.data.people.hidden">
-                <dt>Hidden in Synology</dt>
+                <dt>群晖中已隐藏的人物</dt>
                 <dd>{{ num(lib.data.people.hidden) }}</dd>
               </div>
             </dl>
             <p
               v-if="concentration"
               class="muted card-foot"
-              :title="`Gini coefficient ${lib.data.people.gini?.toFixed(2)}`"
+              :title="`基尼系数 ${lib.data.people.gini?.toFixed(2)}`"
             >
               {{ concentration }}
             </p>
           </template>
-          <p v-else class="muted">Synology Photos hasn't tagged any faces yet.</p>
+          <p v-else class="muted">群晖照片尚未标记任何人脸。</p>
         </section>
 
         <section class="card">
-          <h3>Latest face grouping</h3>
+          <h3>最近一次人脸聚类分组</h3>
           <template v-if="lib.data.grouping">
             <p class="muted card-lede">
-              Run #{{ lib.data.grouping.run_id }} · {{ ago(lib.data.grouping.created_at) }}
+              第 #{{ lib.data.grouping.run_id }} 次聚类 · {{ ago(lib.data.grouping.created_at) }}
             </p>
             <dl class="kv kv-grid">
               <div v-for="g in groupingRows" :key="g.label">
@@ -971,8 +960,7 @@ const groupingRows = computed(() => {
             </dl>
           </template>
           <p v-else class="muted">
-            Not grouped yet. Run <strong>Group faces</strong> from the
-            <RouterLink to="/pipeline">Pipeline</RouterLink> page once faces are detected.
+            尚未进行聚类分组。完成人脸检测后，请前往<RouterLink to="/pipeline">处理流程</RouterLink>页面运行<strong>人脸聚类分组</strong>。
           </p>
         </section>
       </template>

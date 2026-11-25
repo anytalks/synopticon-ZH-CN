@@ -20,7 +20,51 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: 'update:modelValue', v: ControlValue): void }>()
 
-const name = computed(() => props.field.title || humanize(props.field.key))
+const ENUM_LABELS: Record<string, string> = {
+  personal: '个人空间',
+  shared: '共享空间',
+  sqlite: 'SQLite（内置单文件）',
+  postgres: 'PostgreSQL',
+  auto: '自动检测（优先 GPU）',
+  cpu: '仅 CPU',
+  cuda: 'NVIDIA CUDA (GPU)',
+  chinese_whispers: 'Chinese Whispers（图传播聚类）',
+  hdbscan: 'HDBSCAN（密度聚类）',
+  assign: '归属认领',
+  low_confidence: '低置信度复核',
+  reassign: '改判人物',
+  merge: '合并未命名分组',
+  merge_named: '合并已命名人物',
+  new_person: '发现新人物',
+}
+
+const FIELD_TITLE_FALLBACKS: Record<string, string> = {
+  'nas.url': '群晖 API 地址',
+  'nas.web_url': '群晖照片网页地址',
+  'nas.verify_tls': '验证 TLS 证书',
+  'nas.account': '群晖账号',
+  'nas.password': '群晖密码',
+  'nas.otp_code': '一次性验证码 (OTP)',
+  'nas.device_name': '设备名称',
+  'nas.spaces': '同步空间',
+  'nas.requests_per_second': '每秒读取请求数',
+  'nas.write_requests_per_second': '每秒写入请求数',
+  'nas.timeout_s': '请求超时（秒）',
+  'storage.data_dir': '数据目录',
+  'storage.models_dir': '模型目录',
+  'storage.keep_originals': '保留原图缓存',
+  'storage.originals_cache_gb': '原图缓存上限 (GB)',
+}
+
+function optionLabel(opt: unknown): string {
+  const s = String(opt)
+  return ENUM_LABELS[s] ?? s
+}
+
+const name = computed(() => {
+  if (props.field.title && /[\u4e00-\u9fff]/.test(props.field.title)) return props.field.title
+  return FIELD_TITLE_FALLBACKS[props.field.dotted] || props.field.title || humanize(props.field.key)
+})
 const kind = computed(() => props.field.info.kind)
 
 // String/select/textarea/number all bind a string model; checkbox binds bool.
@@ -45,12 +89,12 @@ function toggle(opt: unknown, on: boolean) {
 
 const secretPlaceholder = computed(() => {
   const raw = props.rawValue as MaskedSecret | undefined
-  return raw && raw.set ? 'set — leave blank to keep' : 'not set'
+  return raw && raw.set ? '已设置——留空以保持不变' : '未设置'
 })
 
 const envMessage = computed(
   () =>
-    `overridden by ${envVarName(props.field.section, props.field.key)} — saved value has no effect`,
+    `已被环境变量 ${envVarName(props.field.section, props.field.key)} 覆盖——在此保存的值不会生效`,
 )
 </script>
 
@@ -71,7 +115,7 @@ const envMessage = computed(
       />
       <select v-else-if="kind === 'enum'" class="select" v-model="strValue">
         <option v-for="opt in field.info.options" :key="String(opt)" :value="String(opt)">
-          {{ opt }}
+          {{ optionLabel(opt) }}
         </option>
       </select>
       <input v-else-if="kind === 'boolean'" class="check" type="checkbox" v-model="boolValue" />
@@ -83,14 +127,14 @@ const envMessage = computed(
             :checked="checked.has(String(opt))"
             @change="toggle(opt, ($event.target as HTMLInputElement).checked)"
           />
-          {{ opt }}
+          {{ optionLabel(opt) }}
         </label>
       </div>
       <input
         v-else-if="kind === 'array'"
         class="input"
         type="text"
-        placeholder="comma-separated"
+        placeholder="以英文逗号分隔"
         v-model="strValue"
       />
       <textarea v-else-if="kind === 'object'" v-model="strValue"></textarea>
@@ -105,7 +149,7 @@ const envMessage = computed(
 
       <div v-if="field.description" class="field-desc">{{ field.description }}</div>
       <details v-if="field.details" class="field-details">
-        <summary>Technical details</summary>
+        <summary>技术细节</summary>
         <div class="field-details-body">{{ field.details }}</div>
       </details>
       <span v-if="envOverride" class="env-chip">{{ envMessage }}</span>
